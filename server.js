@@ -13,13 +13,12 @@ app.use(express.static(path.join(__dirname, 'front-end')));
 
 const LIMITE_PICO_PADRAO = Number(process.env.LIMITE_PICO_PADRAO) || 1000;
 
-// --- CONFIGURACAO DA CONEXAO COM O POSTGRESQL USANDO .ENV ---
+// --- CONFIGURACAO DA CONEXAO COM O POSTGRESQL (Compatível com Supabase / Render) ---
 const pool = new Pool({
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    host: process.env.DB_HOST,
-    database: process.env.DB_DATABASE,
-    port: Number(process.env.DB_PORT) || 5432,
+    connectionString: process.env.DATABASE_URL,
+    ssl: {
+        rejectUnauthorized: false // Necessário para bancos na nuvem (Supabase/Neon)
+    }
 });
 
 // --- CONFIGURACAO DO MQTT USANDO .ENV ---
