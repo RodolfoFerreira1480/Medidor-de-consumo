@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Energia · Monitor de consumo</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="index.css">
+</head>
+<body>
+    <a class="skip-link" href="#visao-geral">Ir para o conteúdo</a>
+    <aside class="sidebar">
+        <a class="brand" href="#visao-geral"><span class="brand-mark"><i data-lucide="zap" aria-hidden="true"></i></span><span><strong>Energia</strong><small>Monitor de consumo</small></span></a>
+        <nav aria-label="Seções do monitor">
+            <a class="nav-link is-active" href="#visao-geral" aria-current="location">Visão geral</a>
+            <a class="nav-link" href="#historico">Histórico</a>
+            <a class="nav-link" href="#eventos">Eventos</a>
+            <a class="nav-link" href="#configuracoes">Configurações</a>
+        </nav>
+        <div class="device"><div class="device-heading"><span class="device-icon"><i data-lucide="cpu" aria-hidden="true"></i></span><div><strong>Medidor principal</strong><small>ESP32 · MQTT</small></div></div><div role="status" id="status-conexao" class="status-pill">Desconectado do Servidor</div></div>
+    </aside>
+    <main class="dashboard" id="conteudo">
+        <section id="visao-geral" class="page-section" aria-labelledby="titulo-visao">
+            <header class="page-header"><div><p class="eyebrow">OPERAÇÃO EM TEMPO REAL</p><h1 id="titulo-visao">Monitor de consumo</h1><p class="description">Acompanhe a carga, o consumo acumulado e os eventos do sistema.</p></div><div class="last-reading"><span>ÚLTIMA LEITURA</span><p id="ultima-leitura">Aguardando dados</p></div></header>
+            <section id="alerta-pico" class="alert-banner hidden" aria-live="polite">
+            <div class="alert-icon" aria-hidden="true">
+                <i data-lucide="triangle-alert"></i>
+            </div>
+            <div>
+                <strong>Atenção! Pico de Energia Detectado</strong>
+                <span>O limite seguro foi excedido e a proteção pode acionar o desarme.</span>
+            </div>
+        </section>
+            <div class="metrics-grid" aria-label="Medições em tempo real"><article class="panel metric-card">
+                    <div class="metric-icon power" aria-hidden="true">
+                        <i data-lucide="badge-watt"></i>
+                    </div>
+                    <div>
+                        <p class="metric-label">Potência Atual</p>
+                        <p id="val-potencia" class="metric-value text-blue">0 <span class="metric-unit">W</span></p>
+                    </div>
+                <p class="metric-hint">Carga instantânea do sistema</p></article>
+<article class="panel metric-card">
+                    <div class="metric-icon voltage" aria-hidden="true">
+                        <i data-lucide="bolt"></i>
+                    </div>
+                    <div>
+                        <p class="metric-label">Tensão de entrada</p>
+                        <p id="val-tensao" class="metric-value text-yellow">0 <span class="metric-unit">V</span></p>
+                    </div>
+                <p class="metric-hint">Valor medido na entrada</p></article>
+<article class="panel metric-card">
+                    <div>
+                        <p class="metric-label">Tensão de saída</p>
+                        <p id="val-tensao-saida" class="metric-value" title="Leitura ainda não recebida">— <span class="metric-unit">V</span></p>
+                    </div>
+                <p class="metric-hint">Valor medido na saída</p></article>
+<article class="panel metric-card">
+                    <div class="metric-icon current" aria-hidden="true">
+                        <i data-lucide="activity"></i>
+                    </div>
+                    <div>
+                        <p class="metric-label">Corrente</p>
+                        <p id="val-corrente" class="metric-value text-red">0 <span class="metric-unit">A</span></p>
+                    </div>
+                <p class="metric-hint">Corrente instantânea</p></article>
+<article class="panel metric-card">
+                    <div class="metric-icon" aria-hidden="true">
+                        <i data-lucide="zap"></i>
+                    </div>
+                    <div>
+                        <p class="metric-label">Consumo Total</p>
+                        <p id="val-kwh" class="metric-value">0 <span class="metric-unit">kWh</span></p>
+                    </div>
+                <p class="metric-hint">Total informado pelo medidor</p></article></div>
+            <div class="main-grid"><section class="panel chart-panel">
+                <div class="chart-header">
+                    <div><p class="eyebrow">TEMPO REAL</p><h2 class="panel-title">Histórico de potência</h2></div>
+                    <span class="chart-badge">Atualização automática</span>
+                </div>
+                <div class="chart-frame">
+                    <canvas id="graficoPotencia"></canvas>
+                </div>
+            </section><section class="panel control-panel">
+                <p class="eyebrow">CONTROLE</p><h2 class="panel-title">Alimentação</h2><p class="description">Envie um comando para a saída do medidor.</p>
+                <div class="control-actions">
+                    <button class="action-button primary" type="button" onclick="enviarComando('ligar')">
+                        <i data-lucide="power"></i>
+                        <span>Ligar saída</span>
+                    </button>
+                    <button class="action-button danger" type="button" onclick="enviarComando('desligar')">
+                        <i data-lucide="power-off"></i>
+                        <span>Desligar saída</span>
+                    </button>
+                </div>
+                <p aria-live="polite" id="feedback-comando" class="feedback"></p>
+            </section></div>
+        </section>
+        <section id="historico" class="page-section" aria-labelledby="titulo-historico">
+            <header class="section-heading"><p class="eyebrow">HISTÓRICO</p><h2 id="titulo-historico">Consumo por período</h2><p class="description">Veja a distribuição do consumo ao longo das horas e dos dias.</p></header>
+            <section class="panel side-chart">
+                <div class="chart-header">
+                    <h2 class="panel-title">Consumo por hora</h2>
+                </div>
+                <div class="chart-frame">
+                    <canvas id="graficoConsumoDiario"></canvas>
+                </div>
+            </section>
+            <div class="summary-grid"><section class="panel donut-panel">
+                <h2 class="donut-title">Hoje</h2>
+                <div class="donut-wrap">
+                    <canvas id="pizzaDiaria"></canvas>
+                    <div class="donut-center">
+                        <strong id="total-dia">0</strong>
+                        <span>kWh</span>
+                    </div>
+                </div>
+                <div id="bars-dia" class="mini-bars" aria-hidden="true"></div>
+            </section>
+<section class="panel donut-panel">
+                <h2 class="donut-title">Nesta semana</h2>
+                <div class="donut-wrap">
+                    <canvas id="pizzaSemanal"></canvas>
+                    <div class="donut-center">
+                        <strong id="total-semana">0</strong>
+                        <span>kWh</span>
+                    </div>
+                </div>
+                <div id="bars-semana" class="mini-bars" aria-hidden="true"></div>
+            </section>
+<section class="panel donut-panel">
+                <h2 class="donut-title">Neste mês</h2>
+                <div class="donut-wrap">
+                    <canvas id="pizzaMensal"></canvas>
+                    <div class="donut-center">
+                        <strong id="total-mes">0</strong>
+                        <span>kWh</span>
+                    </div>
+                </div>
+                <div id="bars-mes" class="mini-bars" aria-hidden="true"></div>
+            </section></div>
+        </section>
+        <section id="eventos" class="page-section" aria-labelledby="titulo-eventos">
+            <header class="section-heading"><p class="eyebrow">EVENTOS</p><h2 id="titulo-eventos">Ocorrências do sistema</h2><p class="description">Picos de potência registrados hoje acima do limite configurado.</p></header>
+            <section class="panel peak-panel">
+                <h2 id="titulo-picos" class="panel-title">
+                    <i data-lucide="triangle-alert"></i>
+                    Picos acima de 1.000 W
+                </h2>
+                <ul id="listaPicos" class="peak-list">
+                    <li class="empty-state">Nenhum pico registrado hoje.</li>
+                </ul>
+            </section>
+        </section>
+        <section id="configuracoes" class="page-section" aria-labelledby="titulo-configuracoes">
+            <header class="section-heading"><p class="eyebrow">CONFIGURAÇÕES</p><h2 id="titulo-configuracoes">Parâmetros do medidor</h2><p class="description">Defina o limite usado para detectar picos de potência.</p></header>
+            <section class="panel config-panel">
+                <h2 class="panel-title">
+                    <i data-lucide="settings"></i>
+                    Limite de pico
+                </h2>
+                <label class="config-label" for="input-limite">
+                    <span>Potência em watts</span>
+                    </label>
+                <div class="config-row">
+                    <input class="limit-input" type="number" id="input-limite" value="1000" min="1" step="1">
+                    <button class="save-button" type="button" onclick="salvarNovoLimite()">Salvar</button>
+                </div>
+                <p aria-live="polite" id="msg-limite" class="limit-message"></p>
+            </section>
+        </section>
+        <footer class="footer"><span>Energia / Monitor DC</span><span>Leituras atualizadas a cada 2 segundos</span></footer>
+    </main>
+    <script src="script.js"></script>
+    <script src="navigation.js"></script>
+</body>
+</html>

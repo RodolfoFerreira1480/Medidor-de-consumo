@@ -1,0 +1,21 @@
+{
+  "name": "medidor-backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --check server.js && node --check front-end/script.js && node --test tests/*.test.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "mqtt": "^5.15.2",
+    "pg": "^8.23.0"
+  }
+}
