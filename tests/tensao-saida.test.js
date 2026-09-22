@@ -23,6 +23,22 @@ function backend() {
     return { context, routes, handlers, queries };
 }
 
+test('banco usa URL no Render, TLS no Supabase e rejeita host ausente em producao', () => {
+    const { context: c } = backend();
+    assert.throws(() => c.configurarBanco({ RENDER: 'true' }), /Configure DATABASE_URL/);
+    const url = 'postgresql://usuario:senha@aws-0-region.pooler.supabase.com:5432/postgres';
+    const remoto = c.configurarBanco({ RENDER: 'true', DATABASE_URL: url, DB_HOST: 'localhost' });
+    assert.equal(remoto.connectionString, url);
+    assert.equal(remoto.host, undefined);
+    assert.equal(remoto.ssl.rejectUnauthorized, true);
+    const separado = c.configurarBanco({ DB_HOST: 'db.exemplo.supabase.co', DB_USER: 'postgres' });
+    assert.equal(separado.host, 'db.exemplo.supabase.co');
+    assert.equal(separado.ssl.rejectUnauthorized, true);
+    const local = c.configurarBanco({ DB_HOST: 'localhost' });
+    assert.equal(local.ssl, false);
+    assert.equal(local.port, 5432);
+});
+
 test('normaliza saida, distingue zero de ausencia e preserva payload antigo', () => {
     const { context: c } = backend();
     assert.equal(c.normalizarLeitura({ tensao: 24, tensaoSaida: 12, corrente: 2 }).potencia, 24);

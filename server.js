@@ -12,15 +12,32 @@ app.use(express.static(path.join(__dirname, 'front-end')));
 
 const LIMITE_PICO_PADRAO = Number(process.env.LIMITE_PICO_PADRAO) || 1000;
 
-// PostgreSQL local, usando as variaveis DB_* do .env deste projeto.
-const pool = new Pool({
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    host: process.env.DB_HOST,
-    database: process.env.DB_DATABASE,
-    port: Number(process.env.DB_PORT) || 5432,
-    ssl: false
-});
+// DATABASE_URL tem prioridade; DB_* continua disponivel para configuracao local.
+function configurarBanco(env) {
+    const connectionString = env.DATABASE_URL?.trim();
+    const host = env.DB_HOST?.trim();
+    if (env.RENDER && !connectionString && !host) {
+        throw new Error('Configure DATABASE_URL ou DB_HOST no Environment do Render com a conexao PostgreSQL do Supabase.');
+    }
+    const config = connectionString ? { connectionString } : {
+        user: env.DB_USER,
+        password: env.DB_PASSWORD,
+        host,
+        database: env.DB_DATABASE,
+        port: Number(env.DB_PORT) || 5432,
+    };
+    // TLS com validacao do certificado para conexoes hospedadas.
+    const usarSSL = env.DB_SSL === 'true' || (env.DB_SSL !== 'false'
+        && (Boolean(env.RENDER) || /supabase\.(com|co)([/:?]|$)/i.test(connectionString || host || '')));
+    config.ssl = usarSSL ? {
+        rejectUnauthorized: true,
+        ...(env.DB_SSL_CA ? { ca: env.DB_SSL_CA.replace(/\\n/g, '\n') } : {}),
+    } : false;
+    config.connectionTimeoutMillis = 10000;
+    return config;
+}
+
+const pool = new Pool(configurarBanco(process.env));
 
 // --- CONFIGURACAO DO MQTT USANDO .ENV ---
 const MQTT_BROKER = process.env.MQTT_BROKER || 'mqtt://broker.hivemq.com:1883';
