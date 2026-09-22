@@ -1,6 +1,5 @@
-require('dotenv').config();
-
 const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 const express = require('express');
 const cors = require('cors');
 const mqtt = require('mqtt');
@@ -13,12 +12,14 @@ app.use(express.static(path.join(__dirname, 'front-end')));
 
 const LIMITE_PICO_PADRAO = Number(process.env.LIMITE_PICO_PADRAO) || 1000;
 
-// --- CONFIGURACAO DA CONEXAO COM O POSTGRESQL (Compatível com Supabase / Render) ---
+// PostgreSQL local, usando as variaveis DB_* do .env deste projeto.
 const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: {
-        rejectUnauthorized: false // Necessário para bancos na nuvem (Supabase/Neon)
-    }
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    host: process.env.DB_HOST,
+    database: process.env.DB_DATABASE,
+    port: Number(process.env.DB_PORT) || 5432,
+    ssl: false
 });
 
 // --- CONFIGURACAO DO MQTT USANDO .ENV ---
