@@ -245,7 +245,7 @@ mqttClient.on('message', async (topic, message) => {
 
             await aplicarProtecaoPico(leitura, limitePicoAtual);
         } catch (e) {
-            console.error('Erro ao processar dados do medidor:', e.message);
+            console.error('Erro ao processar dados do medidor:', e);
         }
     }
 
@@ -413,7 +413,7 @@ const PORT = process.env.PORT || 3000;
 
 inicializarBanco()
     .catch((err) => {
-        console.error('Erro ao preparar o banco de dados:', err.message);
+        console.error('Erro ao preparar o banco de dados:', err);
     })
     .finally(() => {
         app.listen(PORT, () => {
