@@ -133,6 +133,7 @@
                     </div>
                 </div>
                 <div id="bars-dia" class="mini-bars" aria-hidden="true"></div>
+                <div class="cost-summary"><span>Custo estimado</span><strong id="custo-dia">—</strong></div>
             </section>
 <section class="panel donut-panel">
                 <h2 class="donut-title">Nesta semana</h2>
@@ -144,6 +145,7 @@
                     </div>
                 </div>
                 <div id="bars-semana" class="mini-bars" aria-hidden="true"></div>
+                <div class="cost-summary"><span>Custo estimado</span><strong id="custo-semana">—</strong></div>
             </section>
 <section class="panel donut-panel">
                 <h2 class="donut-title">Neste mês</h2>
@@ -155,7 +157,10 @@
                     </div>
                 </div>
                 <div id="bars-mes" class="mini-bars" aria-hidden="true"></div>
+                <div class="cost-summary"><span>Custo estimado</span><strong id="custo-mes">—</strong></div>
             </section></div>
+            <p id="resumo-custos" class="cost-note" role="status">Configure a tarifa de energia para estimar os custos.</p>
+            <a class="cost-config-link" href="#tarifa-energia">Configurar tarifa de energia</a>
         </section>
         <section id="eventos" class="page-section" aria-labelledby="titulo-eventos">
             <header class="section-heading"><p class="eyebrow">EVENTOS</p><h2 id="titulo-eventos">Ocorrências do sistema</h2><p class="description">Picos de potência registrados hoje acima do limite configurado.</p></header>
@@ -170,7 +175,7 @@
             </section>
         </section>
         <section id="configuracoes" class="page-section" aria-labelledby="titulo-configuracoes">
-            <header class="section-heading"><p class="eyebrow">CONFIGURAÇÕES</p><h2 id="titulo-configuracoes">Parâmetros do medidor</h2><p class="description">Defina o limite usado para detectar picos de potência.</p></header>
+            <header class="section-heading"><p class="eyebrow">CONFIGURAÇÕES</p><h2 id="titulo-configuracoes">Parâmetros do medidor</h2><p class="description">Defina o limite de potência e a tarifa usada na estimativa de custos.</p></header>
             <section class="panel config-panel">
                 <h2 class="panel-title">
                     <i data-lucide="settings"></i>
@@ -185,10 +190,45 @@
                 </div>
                 <p aria-live="polite" id="msg-limite" class="limit-message"></p>
             </section>
+            <section id="tarifa-energia" class="panel config-panel tariff-panel" aria-labelledby="titulo-tarifa">
+                <h2 id="titulo-tarifa" class="panel-title"><i data-lucide="wallet" aria-hidden="true"></i>Tarifa de energia</h2>
+                <p class="description">Selecione sua localidade e distribuidora ou informe o preço por kWh da sua conta.</p>
+                <form id="form-tarifa" novalidate>
+                    <fieldset id="tarifa-campos" disabled>
+                        <legend class="sr-only">Configuração da tarifa</legend>
+                        <label class="config-label" for="tarifa-modo">Como definir a tarifa</label>
+                        <select id="tarifa-modo" class="limit-input">
+                            <option value="localidade">Por localidade (ANEEL)</option>
+                            <option value="manual">Informar valor da conta</option>
+                        </select>
+                        <div id="tarifa-localidade" class="tariff-fields">
+                            <div class="tariff-location-row">
+                                <div><label class="config-label" for="tarifa-uf">Estado</label><select id="tarifa-uf" class="limit-input" required><option value="">Selecione o estado</option></select></div>
+                                <div><label class="config-label" for="tarifa-municipio">Cidade (opcional)</label><select id="tarifa-municipio" class="limit-input" disabled><option value="">Todo o estado</option></select></div>
+                            </div>
+                            <div><label class="config-label" for="tarifa-distribuidora">Distribuidora da sua conta</label><select id="tarifa-distribuidora" class="limit-input" required disabled><option value="">Selecione o estado primeiro</option></select></div>
+                            <p class="tariff-help">A tarifa varia por distribuidora. A cidade ajuda a filtrar as opções; confira o nome na sua conta de energia.</p>
+                            <div class="tariff-preview"><span>Tarifa da seleção</span><strong id="tarifa-previa">—</strong><p id="tarifa-vigencia-previa">Selecione uma distribuidora.</p></div>
+                            <p id="tarifa-fonte" class="tariff-help">Fonte: ANEEL · tarifa residencial convencional.</p>
+                            <p id="tarifa-catalogo-aviso" class="tariff-help" role="status"></p>
+                        </div>
+                        <div id="tarifa-manual" class="tariff-fields" hidden>
+                            <div><label class="config-label" for="tarifa-valor">Preço da energia (R$/kWh)</label><input id="tarifa-valor" class="limit-input" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 0,850000" aria-describedby="tarifa-ajuda-manual" disabled></div>
+                            <p id="tarifa-ajuda-manual" class="tariff-help">Use o preço por kWh da sua conta, maior que zero, com até 6 casas decimais. O limite é R$ 100/kWh.</p>
+                        </div>
+                        <button id="salvar-tarifa" class="save-button tariff-save" type="submit">Salvar tarifa</button>
+                    </fieldset>
+                    <p id="feedback-tarifa" class="feedback" aria-live="polite">Carregando configuração…</p>
+                    <button id="recarregar-tarifa" class="save-button tariff-save" type="button" hidden>Tentar novamente</button>
+                </form>
+                <div class="tariff-saved"><span>Tarifa salva para o cálculo</span><strong id="tarifa-salva">Nenhuma tarifa configurada</strong><p id="tarifa-salva-detalhes">Os custos aparecerão após salvar uma tarifa.</p></div>
+                <p id="tarifa-aviso" class="tariff-help">Estimativa = consumo medido × tarifa salva, aplicada a todo o período. As tarifas ANEEL são residenciais convencionais, sem impostos, bandeiras tarifárias ou iluminação pública; o valor não representa a conta final.</p>
+            </section>
         </section>
         <footer class="footer"><span>Energia / Monitor DC</span><span>Leituras atualizadas a cada 2 segundos</span></footer>
     </main>
     <script src="controle-tensao.js"></script>
+    <script src="custos.js"></script>
     <script src="script.js"></script>
     <script src="navigation.js"></script>
 </body>

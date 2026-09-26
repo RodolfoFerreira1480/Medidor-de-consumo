@@ -409,7 +409,17 @@ async function carregarPizzas() {
         preencherPizza(pizzaDiaria, dadosDiaria, 'horario', 'total-dia');
         preencherPizza(pizzaSemanal, dadosSemanal, 'data', 'total-semana');
         preencherPizza(pizzaMensal, dadosMensal, 'data', 'total-mes');
+        const totalPeriodo = (dados) => Array.isArray(dados) && dados.length && dados.every((item) =>
+            (typeof item.consumo_total === 'number' || (typeof item.consumo_total === 'string' && item.consumo_total.trim() !== '')) &&
+            Number.isFinite(Number(item.consumo_total)) && Number(item.consumo_total) >= 0)
+            ? dados.reduce((total, item) => total + Number(item.consumo_total), 0) : null;
+        window.atualizarConsumoCustos?.({
+            dia: totalPeriodo(dadosDiaria),
+            semana: totalPeriodo(dadosSemanal),
+            mes: totalPeriodo(dadosMensal),
+        });
     } catch (e) {
+        window.atualizarConsumoCustos?.(null);
         console.error('Erro ao carregar graficos de pizza:', e);
     }
 }
