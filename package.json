@@ -5,7 +5,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node --check server.js && node --check front-end/script.js && node --check front-end/controle-tensao.js && node --check front-end/theme.js && node --test tests/*.test.js"
+    "test": "node --check server.js && node --check lib/tarifas.js && node --check scripts/atualizar-tarifas.cjs && node --check front-end/script.js && node --check front-end/controle-tensao.js && node --check front-end/theme.js && node --check front-end/custos.js && node --test tests/*.test.js",
+    "tarifas:atualizar": "node scripts/atualizar-tarifas.cjs"
   },
   "keywords": [],
   "author": "",

@@ -4,6 +4,7 @@ const express = require('express');
 const cors = require('cors');
 const mqtt = require('mqtt');
 const { Pool } = require('pg');
+const { registrarRotasTarifas } = require('./lib/tarifas');
 
 const app = express();
 app.use(express.json());
@@ -37,6 +38,7 @@ function configurarBanco(env) {
 }
 
 const pool = new Pool(configurarBanco(process.env));
+registrarRotasTarifas(app, pool);
 
 const MQTT_BROKER = process.env.MQTT_BROKER || 'mqtt://broker.hivemq.com:1883';
 const TOPIC_DADOS = process.env.MQTT_TOPIC_DADOS || 'smart-meter/medidor/dados';

@@ -16,6 +16,7 @@ function backend() {
         publish(topic, message, options, callback) { publishes.push({ topic, message: JSON.parse(message), options }); callback(); } };
     const context = vm.createContext({
         require(name) {
+            if (name === './lib/tarifas') return { registrarRotasTarifas() {} };
             return { dotenv: { config() {} }, path, express, cors: () => {},
                 mqtt: { connect: () => mqtt }, pg: { Pool: function () { return pool; } } }[name];
         }, __dirname: path.resolve(__dirname, '..'), process: { env: {} }, console: { log() {}, error() {} },
