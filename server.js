@@ -11,8 +11,8 @@ app.use(cors());
 app.use(express.static(path.join(__dirname, 'front-end')));
 
 const LIMITE_PICO_PADRAO = Number(process.env.LIMITE_PICO_PADRAO) || 1000;
+const VALIDADE_LEITURA_MS = 15000;
 
-// DATABASE_URL tem prioridade; DB_* continua disponivel para configuracao local.
 function configurarBanco(env) {
     const connectionString = env.DATABASE_URL?.trim();
     const host = env.DB_HOST?.trim();
@@ -26,7 +26,6 @@ function configurarBanco(env) {
         database: env.DB_DATABASE,
         port: Number(env.DB_PORT) || 5432,
     };
-    // TLS com validacao do certificado para conexoes hospedadas.
     const usarSSL = env.DB_SSL === 'true' || (env.DB_SSL !== 'false'
         && (Boolean(env.RENDER) || /supabase\.(com|co)([/:?]|$)/i.test(connectionString || host || '')));
     config.ssl = usarSSL ? {
@@ -39,7 +38,6 @@ function configurarBanco(env) {
 
 const pool = new Pool(configurarBanco(process.env));
 
-// --- CONFIGURACAO DO MQTT USANDO .ENV ---
 const MQTT_BROKER = process.env.MQTT_BROKER || 'mqtt://broker.hivemq.com:1883';
 const TOPIC_DADOS = process.env.MQTT_TOPIC_DADOS || 'smart-meter/medidor/dados';
 const TOPIC_COMANDO = process.env.MQTT_TOPIC_COMANDO || 'smart-meter/medidor/comando';
@@ -50,6 +48,7 @@ const mqttClient = mqtt.connect(MQTT_BROKER);
 let ultimoEstado = {
     tensao: 0,
     tensaoSaida: null,
+    tensaoMaxima: null,
     corrente: 0,
     potencia: 0,
     consumoKWh: 0,
@@ -61,6 +60,26 @@ let ultimoEstado = {
 };
 
 let desarmePorPicoAtivo = false;
+let leituraAoVivo = false;
+let ajusteEmAndamento = false;
+
+function tensaoValida(valor) {
+    if (typeof valor !== 'number' && (typeof valor !== 'string' || !valor.trim())) return null;
+    const numero = Number(valor);
+    return Number.isFinite(numero) && numero >= 0 ? numero : null;
+}
+
+function estadoControleTensao() {
+    let motivo = '';
+    if (!mqttClient.connected) motivo = 'Medidor sem conexão com o broker MQTT.';
+    else if (!leituraAoVivo || !ultimoEstado.timestampLeitura
+        || Date.now() - new Date(ultimoEstado.timestampLeitura).getTime() > VALIDADE_LEITURA_MS) {
+        motivo = 'Aguardando uma leitura recente do ESP32.';
+    } else if (!(ultimoEstado.tensaoMaxima > 0)) {
+        motivo = 'Aguardando a tensão máxima informada pelo ESP32.';
+    }
+    return { disponivel: !motivo, motivo };
+}
 
 function numeroFinito(valor, padrao = 0) {
     const numero = Number(valor);
@@ -71,10 +90,9 @@ function normalizarLeitura(dadosRecebidos) {
     const tensao = numeroFinito(dadosRecebidos.tensao);
     // Ausencia de leitura nao equivale a uma saida medida em zero volts.
     const saidaRecebida = dadosRecebidos.tensaoSaida ?? dadosRecebidos.tensao_saida;
-    const tensaoSaida = (typeof saidaRecebida === 'number'
-        || (typeof saidaRecebida === 'string' && saidaRecebida.trim() !== ''))
-        && Number.isFinite(Number(saidaRecebida)) && Number(saidaRecebida) >= 0
-        ? Number(saidaRecebida) : null;
+    const tensaoSaida = tensaoValida(saidaRecebida);
+    const maxima = tensaoValida(dadosRecebidos.tensaoMaxima ?? dadosRecebidos.tensao_maxima);
+    const tensaoMaxima = maxima > 0 ? maxima : null;
     const corrente = numeroFinito(dadosRecebidos.corrente);
     const potenciaInformada = dadosRecebidos.potencia == null ? NaN : Number(dadosRecebidos.potencia);
     const potencia = Number.isFinite(potenciaInformada) ? potenciaInformada : (tensaoSaida ?? tensao) * corrente;
@@ -85,7 +103,7 @@ function normalizarLeitura(dadosRecebidos) {
         ?? dadosRecebidos.consumo_kwh
     );
 
-    return { tensao, tensaoSaida, corrente, potencia, consumoKWh };
+    return { tensao, tensaoSaida, tensaoMaxima, corrente, potencia, consumoKWh };
 }
 
 async function inicializarBanco() {
@@ -139,14 +157,17 @@ async function salvarLeituraBanco(leitura) {
     );
 }
 
-function publicarComando(comando) {
+function publicarComando(comando, parametros = {}) {
     return new Promise((resolve, reject) => {
         if (!mqttClient.connected) {
             reject(new Error('Broker MQTT desconectado'));
             return;
         }
 
-        mqttClient.publish(TOPIC_COMANDO, JSON.stringify({ comando }), { qos: 1 }, (err) => {
+        const prazo = setTimeout(() => reject(new Error('Envio sem confirmação do broker. Confira a saída antes de tentar novamente.')), 8000);
+        prazo.unref?.();
+        mqttClient.publish(TOPIC_COMANDO, JSON.stringify({ ...parametros, comando }), { qos: 1, retain: false }, (err) => {
+            clearTimeout(prazo);
             if (err) {
                 reject(err);
                 return;
@@ -223,8 +244,10 @@ mqttClient.on('error', (err) => {
     console.error('Erro na conexao MQTT:', err.message);
 });
 
-// Recebendo mensagens do ESP32
-mqttClient.on('message', async (topic, message) => {
+// A reconexão exige nova telemetria; uma mensagem retida não prova que o ESP32 está online.
+mqttClient.on('close', () => { leituraAoVivo = false; });
+
+mqttClient.on('message', async (topic, message, packet) => {
     const payload = message.toString();
 
     if (topic === TOPIC_DADOS) {
@@ -232,6 +255,7 @@ mqttClient.on('message', async (topic, message) => {
 
         try {
             dadosRecebidos = JSON.parse(payload);
+            if (!dadosRecebidos || typeof dadosRecebidos !== 'object' || Array.isArray(dadosRecebidos)) return;
         } catch (e) {
             console.log('Erro ao analisar JSON dos dados:', payload);
             return;
@@ -239,8 +263,10 @@ mqttClient.on('message', async (topic, message) => {
 
         try {
             const leitura = normalizarLeitura(dadosRecebidos);
-            const limitePicoAtual = await buscarLimitePico();
+            // Atualiza a telemetria imediatamente, sem depender da latência do histórico.
+            const limitePicoAtual = ultimoEstado.limitePico;
             const timestamp = new Date();
+            leituraAoVivo = !packet?.retain;
 
             ultimoEstado = {
                 ...leitura,
@@ -278,13 +304,34 @@ mqttClient.on('message', async (topic, message) => {
     }
 });
 
-// --- ROTAS DA API HTTP ---
-
 app.get('/api/status', (req, res) => {
-    res.json(ultimoEstado);
+    res.set?.('Cache-Control', 'no-store');
+    res.json({ ...ultimoEstado, controleTensao: estadoControleTensao() });
 });
 
-// Rota para o site buscar o historico do PostgreSQL
+app.post('/api/tensao-saida', async (req, res) => {
+    const tensaoSaida = tensaoValida(req.body?.tensaoSaida);
+    if (tensaoSaida === null) {
+        return res.status(400).json({ erro: 'Informe uma tensão de saída válida, maior ou igual a zero.' });
+    }
+    const controle = estadoControleTensao();
+    if (!controle.disponivel) return res.status(503).json({ erro: controle.motivo });
+    if (tensaoSaida > ultimoEstado.tensaoMaxima) {
+        return res.status(400).json({ erro: `A tensão não pode ultrapassar ${ultimoEstado.tensaoMaxima} V, limite informado pelo ESP32.` });
+    }
+    if (ajusteEmAndamento) return res.status(409).json({ erro: 'Já existe um ajuste sendo enviado. Aguarde.' });
+    ajusteEmAndamento = true;
+    try {
+        await publicarComando('ajustar_tensao', { tensaoSaida });
+        res.json({ sucesso: true, tensaoSolicitada: tensaoSaida,
+            mensagem: 'Comando enviado. Acompanhe a tensão medida para verificar a saída.' });
+    } catch (err) {
+        res.status(503).json({ erro: `Falha ao enviar ajuste: ${err.message}` });
+    } finally {
+        ajusteEmAndamento = false;
+    }
+});
+
 app.get('/api/historico', async (req, res) => {
     try {
         const query = `SELECT *, tensao_saida AS "tensaoSaida" FROM historico ORDER BY timestamp DESC LIMIT 50`;
@@ -295,7 +342,6 @@ app.get('/api/historico', async (req, res) => {
     }
 });
 
-// Rota para o Grafico Diario (consumo real por hora)
 app.get('/api/consumo-diario', async (req, res) => {
     try {
         const query = consultaDeltaConsumo({
@@ -313,7 +359,6 @@ app.get('/api/consumo-diario', async (req, res) => {
     }
 });
 
-// Rota para o Consumo Semanal (ultimos 7 dias incluindo hoje)
 app.get('/api/consumo-semanal', async (req, res) => {
     try {
         const query = consultaDeltaConsumo({
@@ -331,7 +376,6 @@ app.get('/api/consumo-semanal', async (req, res) => {
     }
 });
 
-// Rota para o Consumo Mensal (mes atual)
 app.get('/api/consumo-mensal', async (req, res) => {
     try {
         const query = consultaDeltaConsumo({
@@ -349,7 +393,6 @@ app.get('/api/consumo-mensal', async (req, res) => {
     }
 });
 
-// Rota para o Historico de Picos de Energia
 app.get('/api/picos', async (req, res) => {
     try {
         const limitePicoAtual = await buscarLimitePico();
@@ -371,7 +414,6 @@ app.get('/api/picos', async (req, res) => {
     }
 });
 
-// Rota para o site consultar qual e o limite salvo no banco
 app.get('/api/config/limite', async (req, res) => {
     try {
         const limite = await buscarLimitePico();
@@ -381,7 +423,6 @@ app.get('/api/config/limite', async (req, res) => {
     }
 });
 
-// Rota para atualizar e salvar o novo limite permanentemente no banco
 app.post('/api/config/limite', async (req, res) => {
     const novoLimiteNumero = Number(req.body.novoLimite);
 
@@ -429,6 +470,7 @@ app.post('/api/comando', async (req, res) => {
 const PORT = process.env.PORT || 3000;
 
 inicializarBanco()
+    .then(async () => { ultimoEstado.limitePico = await buscarLimitePico(); })
     .catch((err) => {
         console.error('Erro ao preparar o banco de dados:', err);
     })

@@ -48,16 +48,11 @@ function mostrarMensagemLimite(texto, sucesso = true) {
     }, 2500);
 }
 
-// =====================================================
-// 1. CONFIGURACAO DOS GRAFICOS (CHART.JS)
-// =====================================================
-
-Chart.defaults.color = '#6c736d';
+Chart.defaults.color = '#586f8a';
 Chart.defaults.font.family = '"Segoe UI", sans-serif';
 Chart.defaults.plugins.legend.display = false;
 Chart.defaults.animation = false;
 
-// Grafico de Linha (Potencia em Tempo Real)
 const ctx = document.getElementById('graficoPotencia').getContext('2d');
 const graficoPotencia = new Chart(ctx, {
     type: 'line',
@@ -66,8 +61,8 @@ const graficoPotencia = new Chart(ctx, {
         datasets: [{
             label: 'Potência (W)',
             data: [],
-            borderColor: '#28624c',
-            backgroundColor: 'rgba(40, 98, 76, 0.06)',
+            borderColor: '#2164cf',
+            backgroundColor: 'rgba(33, 100, 207, 0.09)',
             borderWidth: 2,
             fill: true,
             tension: 0.15,
@@ -79,13 +74,12 @@ const graficoPotencia = new Chart(ctx, {
         responsive: true,
         maintainAspectRatio: false,
         scales: {
-            y: { beginAtZero: true, grid: { color: '#e5e6df' } },
+            y: { beginAtZero: true, grid: { color: '#d5e2f1' } },
             x: { grid: { display: false } },
         },
     },
 });
 
-// Grafico de Linha (Consumo por Hora)
 const ctxDiario = document.getElementById('graficoConsumoDiario').getContext('2d');
 const graficoConsumo = new Chart(ctxDiario, {
     type: 'line',
@@ -94,8 +88,8 @@ const graficoConsumo = new Chart(ctxDiario, {
         datasets: [{
             label: 'Consumo no período (kWh)',
             data: [],
-            borderColor: '#28624c',
-            backgroundColor: 'rgba(40, 98, 76, 0.06)',
+            borderColor: '#2164cf',
+            backgroundColor: 'rgba(33, 100, 207, 0.09)',
             borderWidth: 2,
             fill: true,
             tension: 0.15,
@@ -107,7 +101,7 @@ const graficoConsumo = new Chart(ctxDiario, {
         responsive: true,
         maintainAspectRatio: false,
         scales: {
-            y: { beginAtZero: true, grid: { color: '#e5e6df' } },
+            y: { beginAtZero: true, grid: { color: '#d5e2f1' } },
             x: { grid: { display: false } },
         },
     },
@@ -118,15 +112,14 @@ function gerarCoresConsumo(quantidade) {
     const coresBorda = [];
 
     for (let i = 0; i < quantidade; i++) {
-        const paleta = ['#28624c', '#658775', '#9eb3a1', '#bc9d62', '#d3c8a7', '#7b8982'];
+        const paleta = ['#2164cf', '#4989ec', '#7bb2fb', '#164a99', '#38a7d6', '#b1d3ff'];
         coresBackground.push(paleta[i % paleta.length]);
-        coresBorda.push('#fcfcf9');
+        coresBorda.push(document.documentElement?.dataset.theme === 'dark' ? '#10213a' : '#ffffff');
     }
 
     return { bg: coresBackground, border: coresBorda };
 }
 
-// Configuracao base comum para as 3 pizzas
 const configBasePizza = {
     type: 'doughnut',
     options: {
@@ -144,7 +137,6 @@ const configBasePizza = {
     },
 };
 
-// Inicializando os 3 Graficos de Pizza
 const pizzaDiaria = new Chart(document.getElementById('pizzaDiaria').getContext('2d'), {
     ...configBasePizza,
     data: { labels: [], datasets: [{ data: [], borderWidth: 2 }] },
@@ -160,9 +152,28 @@ const pizzaMensal = new Chart(document.getElementById('pizzaMensal').getContext(
     data: { labels: [], datasets: [{ data: [], borderWidth: 2 }] },
 });
 
-// =====================================================
-// 2. FUNCOES DE COMUNICACAO COM O BACKEND (API)
-// =====================================================
+function atualizarTemaGraficos() {
+    const escuro = document.documentElement?.dataset.theme === 'dark';
+    const texto = escuro ? '#a1b6d3' : '#586f8a';
+    const linha = escuro ? '#29415f' : '#d5e2f1';
+    Chart.defaults.color = texto;
+    for (const grafico of [graficoPotencia, graficoConsumo]) {
+        grafico.data.datasets[0].borderColor = escuro ? '#84b8ff' : '#2164cf';
+        grafico.data.datasets[0].backgroundColor = escuro ? 'rgba(132, 184, 255, .1)' : 'rgba(33, 100, 207, .09)';
+        for (const eixo of Object.values(grafico.options.scales)) {
+            eixo.ticks = { ...eixo.ticks, color: texto };
+            eixo.grid.color = linha;
+            eixo.border = { color: linha };
+        }
+        grafico.update('none');
+    }
+    for (const grafico of [pizzaDiaria, pizzaSemanal, pizzaMensal]) {
+        grafico.data.datasets[0].borderColor = escuro ? '#10213a' : '#ffffff';
+        grafico.update('none');
+    }
+}
+window.addEventListener?.('themechange', atualizarTemaGraficos);
+atualizarTemaGraficos();
 
 function adicionarPontoPotencia(timestamp, potencia) {
     if (!timestamp || timestamp === ultimoTimestampGrafico) {
@@ -182,7 +193,6 @@ function adicionarPontoPotencia(timestamp, potencia) {
     graficoPotencia.update();
 }
 
-// Carrega o historico da linha do tempo inicial
 async function carregarHistoricoInicial() {
     try {
         const resposta = await fetch(apiUrl('/api/historico'));
@@ -219,7 +229,6 @@ async function carregarLimite() {
     }
 }
 
-// Busca os dados em tempo real para os cards e o grafico de linha
 async function atualizarDados() {
     try {
         const resposta = await fetch(apiUrl('/api/status'));
@@ -227,6 +236,7 @@ async function atualizarDados() {
 
         const dados = await resposta.json();
         const potenciaAtual = numeroFinito(dados.potencia);
+        if (typeof window.atualizarControleTensao === 'function') window.atualizarControleTensao(dados);
         const emAlerta = Boolean(dados.statusAlerta) || potenciaAtual > limitePicoUI;
 
         atualizarStatusConexao(true);
@@ -253,10 +263,12 @@ async function atualizarDados() {
         adicionarPontoPotencia(dados.timestampLeitura || dados.timestamp, potenciaAtual);
     } catch (erro) {
         atualizarStatusConexao(false);
+        if (typeof window.atualizarControleTensao === 'function') {
+            window.atualizarControleTensao({ controleTensao: { motivo: 'Sem conexão com o servidor.' } });
+        }
     }
 }
 
-// Busca o consumo agrupado por hora
 async function carregarConsumoDiario() {
     try {
         const resposta = await fetch(apiUrl('/api/consumo-diario'));
@@ -273,7 +285,6 @@ async function carregarConsumoDiario() {
     }
 }
 
-// Busca a lista de picos de energia de hoje
 async function carregarPicos() {
     try {
         const resposta = await fetch(apiUrl('/api/picos'));
@@ -309,7 +320,6 @@ async function carregarPicos() {
     }
 }
 
-// Envia comandos de controle para o ESP32 (reles)
 async function enviarComando(acao) {
     const feedback = document.getElementById('feedback-comando');
     feedback.textContent = `Enviando comando '${acao}'...`;
@@ -376,17 +386,14 @@ function preencherPizza(grafico, dados, campoLabel, idTotal) {
     grafico.data.datasets[0].borderColor = cores.border;
     grafico.update();
 
-    // Soma o total de consumo e injeta no centro do gráfico (HTML)
     if (idTotal) {
         const total = dados.reduce((acc, curr) => acc + numeroFinito(curr.consumo_total), 0);
         document.getElementById(idTotal).textContent = formatarNumero(total, 1);
     }
 }
 
-// Nas chamadas dentro da função carregarPizzas(), adicione o ID do elemento central:
 async function carregarPizzas() {
     try {
-        // ... (Mantenha os fetch() originais) ...
         const [resDiaria, resSemanal, resMensal] = await Promise.all([
             fetch(apiUrl('/api/consumo-diario')),
             fetch(apiUrl('/api/consumo-semanal')),
@@ -399,7 +406,6 @@ async function carregarPizzas() {
             resDiaria.json(), resSemanal.json(), resMensal.json(),
         ]);
 
-        // Adicionando os IDs correspondentes ao centro das pizzas
         preencherPizza(pizzaDiaria, dadosDiaria, 'horario', 'total-dia');
         preencherPizza(pizzaSemanal, dadosSemanal, 'data', 'total-semana');
         preencherPizza(pizzaMensal, dadosMensal, 'data', 'total-mes');
@@ -407,10 +413,6 @@ async function carregarPizzas() {
         console.error('Erro ao carregar graficos de pizza:', e);
     }
 }
-
-// =====================================================
-// 3. INICIALIZACAO E ATUALIZACOES AUTOMATICAS
-// =====================================================
 
 async function iniciarPainel() {
     await carregarLimite();
@@ -425,15 +427,12 @@ async function iniciarPainel() {
 
 iniciarPainel();
 
-// Atualiza os cards e o grafico de linha a cada 2 segundos
 setInterval(atualizarDados, 2000);
 
-// Atualiza o grafico de consumo por hora, picos e pizzas a cada 5 segundos
 setInterval(() => {
     carregarConsumoDiario();
     carregarPicos();
     carregarPizzas();
 }, 5000);
 
-// Ativa os ícones na tela (Isso conserta os quadrados vazios!)
 lucide.createIcons();

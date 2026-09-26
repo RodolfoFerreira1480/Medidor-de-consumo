@@ -1,4 +1,3 @@
-// Mantem o menu sincronizado com a secao visivel, inclusive ao usar links diretos.
 const linksSecoes = [...document.querySelectorAll('.nav-link')];
 const secoesPainel = [...document.querySelectorAll('.page-section')];
 function destacarSecao(id) {
