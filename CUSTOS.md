@@ -1,5 +1,11 @@
 # Estimativa de custo
 
+Para usar no computador, inicie o servidor com `Iniciar medidor.cmd` ou
+`npm start` na pasta do projeto. Depois abra `http://localhost:3000`
+(ou a porta configurada em `PORT`). Abrir apenas `front-end/index.html`
+não inicia o servidor. O catálogo depende do servidor; salvar a tarifa
+também depende da conexão com o banco configurado no `.env`.
+
 Em **Configurações → Tarifa de energia**, selecione o estado e, se quiser,
 a cidade. Escolha a distribuidora que aparece na sua conta e salve a tarifa.
 A cidade filtra as distribuidoras; não existe uma tarifa única por estado

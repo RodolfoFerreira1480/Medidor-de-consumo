@@ -10,6 +10,7 @@
     const valor = document.getElementById('tarifa-valor');
     const botao = document.getElementById('salvar-tarifa');
     const feedback = document.getElementById('feedback-tarifa');
+    const recarregar = document.getElementById('recarregar-tarifa');
     const base = window.location.protocol === 'file:' ? 'http://localhost:3000' : '';
     const moeda = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
     const preco = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 6 });
@@ -24,6 +25,9 @@
     let versaoLocalidade = 0;
     let versaoConfiguracao = 0;
     let consultaConfiguracao = false;
+    let estadosDisponiveis = false;
+    let consultaEstados = null;
+    let formularioRestaurado = false;
 
     function mensagem(texto, erro = false) {
         feedback.textContent = texto;
@@ -35,12 +39,21 @@
         const timeout = setTimeout(() => controle.abort(), 12000);
         try {
             const resposta = await fetch(`${base}${caminho}`, { ...opcoes, signal: controle.signal });
-            const dados = await resposta.json();
+            let dados;
+            try {
+                dados = await resposta.json();
+            } catch {
+                throw new Error(window.location.protocol === 'file:'
+                    ? 'O servidor local não está respondendo à consulta de tarifas. Inicie a versão atualizada do servidor e abra http://localhost:3000.'
+                    : 'Este endereço não está respondendo à consulta de tarifas. Verifique se o servidor do medidor está atualizado e em execução.');
+            }
             if (!resposta.ok) throw new Error(dados.erro || 'Não foi possível consultar a tarifa.');
             return dados;
         } catch (erro) {
             if (erro.name === 'AbortError') throw new Error('A consulta demorou demais. Tente novamente.');
-            if (erro instanceof TypeError) throw new Error('Sem conexão com o servidor. Tente novamente.');
+            if (erro.name === 'TypeError') throw new Error(window.location.protocol === 'file:'
+                ? 'Inicie o servidor local e abra http://localhost:3000 para carregar os estados e salvar a tarifa.'
+                : 'Sem conexão com o servidor. Tente novamente.');
             throw erro;
         } finally {
             clearTimeout(timeout);
@@ -131,6 +144,12 @@
         valor.required = !local;
         botao.disabled = salvando || !pronto || (local && (carregandoLocalidade || !uf.value || !distribuidora.value));
         botao.textContent = salvando ? 'Salvando…' : 'Salvar tarifa';
+        atualizarRecuperacao();
+    }
+
+    function atualizarRecuperacao() {
+        recarregar.hidden = estadosDisponiveis && configuracaoDisponivel;
+        recarregar.disabled = Boolean(consultaEstados) || consultaConfiguracao || salvando;
     }
 
     function mostrarPrevia() {
@@ -185,54 +204,70 @@
         }
     }
 
-    const estadosProntos = (async () => {
-        try {
-            const dados = await consultar('/api/tarifas/estados');
-            preencherSelect(uf, 'Selecione o estado', dados.estados, 'sigla', 'nome');
-            const fonte = document.getElementById('tarifa-fonte');
-            fonte.textContent = `Fonte: ${dados.fonte?.nome || 'ANEEL'}. Base atualizada em ${dataLegivel(dados.atualizadoEm)}. `;
-            if (dados.fonte?.url?.startsWith('https://dadosabertos.aneel.gov.br/')) {
-                const link = document.createElement('a');
-                link.href = dados.fonte.url;
-                link.target = '_blank';
-                link.rel = 'noopener noreferrer';
-                link.textContent = 'Consultar fonte';
-                fonte.append(link);
+    function carregarEstados() {
+        if (estadosDisponiveis) return Promise.resolve();
+        if (consultaEstados) return consultaEstados;
+        consultaEstados = (async () => {
+            try {
+                const dados = await consultar('/api/tarifas/estados');
+                if (!Array.isArray(dados.estados) || !dados.estados.length) throw new Error('A lista de estados não está disponível. Tente novamente.');
+                preencherSelect(uf, 'Selecione o estado', dados.estados, 'sigla', 'nome', uf.value);
+                estadosDisponiveis = true;
+                document.getElementById('tarifa-catalogo-aviso').textContent = '';
+                const fonte = document.getElementById('tarifa-fonte');
+                fonte.textContent = `Fonte: ${dados.fonte?.nome || 'ANEEL'}. Base atualizada em ${dataLegivel(dados.atualizadoEm)}. `;
+                if (dados.fonte?.url?.startsWith('https://dadosabertos.aneel.gov.br/')) {
+                    const link = document.createElement('a');
+                    link.href = dados.fonte.url;
+                    link.target = '_blank';
+                    link.rel = 'noopener noreferrer';
+                    link.textContent = 'Consultar fonte';
+                    fonte.append(link);
+                }
+                if (configuracaoDisponivel) await restaurarFormulario(salvo.configuracao);
+            } catch (erro) {
+                document.getElementById('tarifa-catalogo-aviso').textContent = `Catálogo indisponível. ${erro.message}`;
+            } finally {
+                consultaEstados = null;
+                atualizarRecuperacao();
             }
-        } catch (erro) {
-            document.getElementById('tarifa-catalogo-aviso').textContent = 'Catálogo indisponível. Você pode informar o preço da sua conta no modo manual.';
-        }
-    })();
+        })();
+        atualizarRecuperacao();
+        return consultaEstados;
+    }
 
     async function restaurarFormulario(configuracao) {
-        await estadosProntos;
-        if (editado || salvando) return;
+        if (formularioRestaurado || editado || salvando) return;
+        if (configuracao?.modo === 'localidade' && !estadosDisponiveis) return;
+        formularioRestaurado = true;
         modo.value = configuracao?.modo || 'localidade';
         valor.value = configuracao?.modo === 'manual' ? String(configuracao.valorKWh).replace('.', ',') : '';
         uf.value = configuracao?.uf || '';
         atualizarFormulario();
-        if (modo.value === 'localidade') await carregarLocalidade(configuracao?.municipio, configuracao?.distribuidoraId);
+        if (modo.value === 'localidade' && uf.value) await carregarLocalidade(configuracao?.municipio, configuracao?.distribuidoraId);
     }
 
     async function carregarConfiguracao(inicial = false) {
         if (consultaConfiguracao || salvando) return;
         const versao = ++versaoConfiguracao;
+        const recuperando = !configuracaoDisponivel;
         consultaConfiguracao = true;
+        atualizarRecuperacao();
         try {
             const dados = await consultar('/api/config/tarifa');
             if (versao !== versaoConfiguracao) return;
             salvo = dados;
             configuracaoDisponivel = true;
             mostrarSalvo();
-            if (inicial) {
+            if ((inicial || recuperando) && !editado) {
                 mensagem(dados.aviso || 'Escolha uma tarifa e salve para calcular os custos.');
-                await restaurarFormulario(dados.configuracao);
             }
+            await restaurarFormulario(dados.configuracao);
         } catch (erro) {
             if (versao !== versaoConfiguracao) return;
             configuracaoDisponivel = false;
             mostrarSalvo();
-            if (inicial) mensagem(erro.message, true);
+            if (inicial || !editado) mensagem(erro.message, true);
         } finally {
             consultaConfiguracao = false;
             if (inicial) pronto = true;
@@ -248,6 +283,7 @@
     modo.addEventListener('change', () => {
         marcarEdicao();
         atualizarFormulario();
+        if (modo.value === 'localidade') carregarEstados();
     });
     uf.addEventListener('change', () => {
         marcarEdicao();
@@ -263,6 +299,10 @@
         atualizarFormulario();
     });
     valor.addEventListener('input', marcarEdicao);
+    recarregar.addEventListener('click', () => {
+        carregarEstados();
+        carregarConfiguracao();
+    });
 
     form.addEventListener('submit', async (evento) => {
         evento.preventDefault();
@@ -297,6 +337,7 @@
             salvo = dados;
             configuracaoDisponivel = true;
             editado = false;
+            formularioRestaurado = true;
             mostrarSalvo();
             mensagem(dados.aviso || 'Tarifa salva. A estimativa usa este valor para todo o período.');
         } catch (erro) {
@@ -307,9 +348,11 @@
         }
     });
 
+    carregarEstados();
     carregarConfiguracao(true);
     setInterval(() => {
         mostrarSalvo();
+        carregarEstados();
         carregarConfiguracao();
     }, 60000);
 })();

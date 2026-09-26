@@ -16,11 +16,11 @@ const concluirRequisicoes = async () => {
     for (let i = 0; i < 8; i++) await new Promise((resolve) => setImmediate(resolve));
 };
 
-function painel(configuracao = { configuracao: null, tarifa: null, aviso: null }) {
+function painel(configuracao = { configuracao: null, tarifa: null, aviso: null }, opcoesPainel = {}) {
     const elementos = new Map();
     const periodicos = [];
     const requisicoes = [];
-    const servidor = { salvo: configuracao, interceptar: null };
+    const servidor = { salvo: configuracao, interceptar: opcoesPainel.interceptar || null };
     function elemento(id) {
         if (!elementos.has(id)) elementos.set(id, {
             value: id === 'tarifa-modo' ? 'localidade' : '', textContent: '', listeners: {}, options: [], hidden: false,
@@ -32,7 +32,7 @@ function painel(configuracao = { configuracao: null, tarifa: null, aviso: null }
         });
         return elementos.get(id);
     }
-    const window = { location: { protocol: 'http:' } };
+    const window = { location: { protocol: opcoesPainel.protocolo || 'http:' } };
     const contexto = vm.createContext({
         window, Intl, Date, AbortController, URLSearchParams,
         Option: function (text, value) { this.text = text; this.value = value; },
@@ -177,4 +177,79 @@ test('tarifa oficial expirada não é usada mesmo se o servidor devolver um valo
     p.window.atualizarConsumoCustos({ dia: 10 });
     assert.equal(p.custo('dia'), '—');
     assert.match(p.elemento('resumo-custos').textContent, /não está vigente/);
+});
+
+test('estados e configuração recuperam após falha inicial sem recarregar a página', async () => {
+    const p = painel({
+        configuracao: { modo: 'localidade', uf: 'SP', municipio: '3550308', distribuidoraId: 'SP' },
+        tarifa: { valorKWh: 0.8, origem: 'aneel', distribuidora: 'SP', inicioVigencia: '2020-01-01', fimVigencia: '2099-12-31' },
+    }, { interceptar: () => resposta({ erro: 'Servidor iniciando' }, false) });
+    await concluirRequisicoes();
+    assert.equal(p.elemento('recarregar-tarifa').hidden, false);
+    assert.match(p.elemento('tarifa-catalogo-aviso').textContent, /Catálogo indisponível/);
+    p.servidor.interceptar = null;
+    await p.atualizar();
+    assert.equal(p.elemento('tarifa-uf').options.length, 3);
+    assert.equal(p.elemento('tarifa-uf').value, 'SP');
+    assert.equal(p.elemento('tarifa-municipio').value, '3550308');
+    assert.equal(p.elemento('tarifa-distribuidora').value, 'SP');
+    assert.equal(p.elemento('recarregar-tarifa').hidden, true);
+    p.window.atualizarConsumoCustos({ dia: 10 });
+    assert.equal(p.custo('dia'), 'R$8,00');
+    const chamadasEstados = p.requisicoes.filter((req) => req.url === '/api/tarifas/estados').length;
+    await p.atualizar();
+    assert.equal(p.requisicoes.filter((req) => req.url === '/api/tarifas/estados').length, chamadasEstados);
+});
+
+test('botão e atualização automática compartilham a mesma tentativa de recuperar estados', async () => {
+    const p = painel(undefined, {
+        interceptar: (url) => url === '/api/tarifas/estados' ? resposta({ erro: 'Catálogo indisponível' }, false) : undefined,
+    });
+    await concluirRequisicoes();
+    assert.match(p.elemento('tarifa-catalogo-aviso').textContent, /Catálogo indisponível/);
+    let concluirEstados;
+    p.servidor.interceptar = (url) => url === '/api/tarifas/estados'
+        ? new Promise((resolve) => { concluirEstados = () => resolve(resposta({ estados: [{ sigla: 'SP', nome: 'São Paulo' }] })); }) : undefined;
+    p.elemento('recarregar-tarifa').listeners.click();
+    await p.atualizar();
+    p.elemento('recarregar-tarifa').listeners.click();
+    assert.equal(p.requisicoes.filter((req) => req.url === '/api/tarifas/estados').length, 2);
+    assert.equal(p.elemento('recarregar-tarifa').disabled, true);
+    concluirEstados();
+    await concluirRequisicoes();
+    assert.equal(p.elemento('tarifa-uf').options.length, 2);
+    assert.equal(p.elemento('tarifa-catalogo-aviso').textContent, '');
+    assert.equal(p.elemento('recarregar-tarifa').hidden, true);
+});
+
+test('arquivo aberto sem servidor orienta iniciar localhost e recuperação preserva rascunho', async () => {
+    const p = painel(configuracaoManual(0.9), {
+        protocolo: 'file:', interceptar: () => { throw new TypeError('Failed to fetch'); },
+    });
+    await concluirRequisicoes();
+    assert.match(p.elemento('feedback-tarifa').textContent, /Inicie o servidor local e abra http:\/\/localhost:3000/);
+    await p.alterar('tarifa-modo', 'manual');
+    await p.alterar('tarifa-valor', '1,234', 'input');
+    p.servidor.interceptar = (url) => {
+        if (url.endsWith('/api/tarifas/estados')) return resposta({ estados: [{ sigla: 'SP', nome: 'São Paulo' }] });
+        if (url.endsWith('/api/config/tarifa')) return resposta(configuracaoManual(0.9));
+    };
+    p.elemento('recarregar-tarifa').listeners.click();
+    await concluirRequisicoes();
+    assert.equal(p.elemento('tarifa-modo').value, 'manual');
+    assert.equal(p.elemento('tarifa-valor').value, '1,234');
+    assert.equal(p.posts().length, 0);
+    p.window.atualizarConsumoCustos({ dia: 10 });
+    assert.equal(p.custo('dia'), 'R$9,00');
+});
+
+test('resposta HTML de servidor antigo mostra orientação em vez de erro JSON', async () => {
+    const p = painel(undefined, {
+        protocolo: 'file:',
+        interceptar: () => ({ ok: false, status: 404, json: async () => { throw new SyntaxError('Unexpected token <'); } }),
+    });
+    await concluirRequisicoes();
+    assert.match(p.elemento('feedback-tarifa').textContent, /versão atualizada do servidor.*http:\/\/localhost:3000/);
+    assert.doesNotMatch(p.elemento('feedback-tarifa').textContent, /Unexpected token/);
+    assert.equal(p.elemento('recarregar-tarifa').hidden, false);
 });
