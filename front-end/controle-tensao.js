@@ -24,7 +24,6 @@
         disponivel = Boolean(maxima && dados?.controleTensao?.disponivel);
         const card = document.getElementById('val-tensao-maxima');
         card.innerHTML = `${maxima === null ? '—' : maxima.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} <span class="metric-unit">V</span>`;
-        document.getElementById('limite-tensao').textContent = maxima === null ? 'Aguardando ESP32' : volts(maxima);
         document.getElementById('range-maximo').textContent = maxima === null ? '— V' : volts(maxima);
         campo.max = faixa.max = maxima ?? 0;
         estado.textContent = disponivel ? `Faixa disponível: 0 a ${volts(maxima)}.`

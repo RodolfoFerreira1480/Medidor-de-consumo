@@ -58,9 +58,6 @@
                         <p id="val-tensao-saida" class="metric-value" title="Leitura ainda não recebida">— <span class="metric-unit">V</span></p>
                     </div>
                 <p class="metric-hint">Valor medido na saída</p></article>
-<article class="panel metric-card maximum-card">
-                    <div><p class="metric-label">Tensão máxima</p><p id="val-tensao-maxima" class="metric-value">— <span class="metric-unit">V</span></p></div>
-                    <p class="metric-hint">Limite informado pelo ESP32</p></article>
 <article class="panel metric-card">
                     <div class="metric-icon current" aria-hidden="true">
                         <i data-lucide="activity"></i>
@@ -88,19 +85,7 @@
                     <canvas id="graficoPotencia"></canvas>
                 </div>
             </section><section class="panel control-panel">
-                <p class="eyebrow">CONTROLE</p><h2 class="panel-title">Tensão de saída</h2><p class="description">Ajuste a saída dentro do limite do medidor.</p>
-                <form id="form-tensao" class="voltage-form">
-                    <div class="voltage-limit"><span>Máximo disponível</span><strong id="limite-tensao">Aguardando ESP32</strong></div>
-                    <label class="config-label" for="input-tensao">Tensão desejada (V)</label>
-                    <div class="voltage-input-row"><input class="limit-input" type="number" id="input-tensao" min="0" step="any" placeholder="0,00" required disabled aria-describedby="estado-tensao"><span>V</span></div>
-                    <input id="range-tensao" class="voltage-range" type="range" min="0" max="0" step="0.01" value="0" disabled aria-label="Ajustar tensão desejada em volts">
-                    <div class="range-labels" aria-hidden="true"><span>0 V</span><span id="range-maximo">— V</span></div>
-                    <p id="estado-tensao" class="control-state" role="status">Aguardando a tensão máxima informada pelo ESP32.</p>
-                    <button id="aplicar-tensao" class="action-button primary" type="submit" disabled>Aplicar tensão</button>
-                    <p id="feedback-tensao" class="feedback" aria-live="polite"></p>
-                    <p class="requested-voltage">Última solicitação: <strong id="tensao-solicitada">—</strong></p>
-                </form>
-                <h3 class="supply-heading">Alimentação</h3>
+                <p class="eyebrow">CONTROLE</p><h2 class="panel-title">Alimentação</h2><p class="description">Envie um comando para a saída do medidor.</p>
                 <div class="control-actions">
                     <button class="action-button primary" type="button" onclick="enviarComando('ligar')">
                         <i data-lucide="power"></i>
@@ -112,6 +97,20 @@
                     </button>
                 </div>
                 <p aria-live="polite" id="feedback-comando" class="feedback"></p>
+                <form id="form-tensao" class="voltage-form">
+                    <h3 class="voltage-heading">Ajuste da tensão de saída</h3>
+                    <div class="voltage-limit"><span>Tensão máxima do ESP32</span><strong id="val-tensao-maxima">— <span class="metric-unit">V</span></strong></div>
+                    <label class="config-label" for="input-tensao">Tensão desejada (V)</label>
+                    <div class="voltage-apply-row">
+                        <div class="voltage-input-row"><input class="limit-input" type="number" id="input-tensao" min="0" step="any" placeholder="0,00" required disabled aria-describedby="estado-tensao"><span>V</span></div>
+                        <button id="aplicar-tensao" class="action-button primary" type="submit" disabled aria-label="Aplicar tensão">Aplicar</button>
+                    </div>
+                    <input id="range-tensao" class="voltage-range" type="range" min="0" max="0" step="0.01" value="0" disabled aria-label="Ajustar tensão desejada em volts">
+                    <div class="range-labels" aria-hidden="true"><span>0 V</span><span id="range-maximo">— V</span></div>
+                    <p id="estado-tensao" class="control-state" role="status">Aguardando a tensão máxima informada pelo ESP32.</p>
+                    <p id="feedback-tensao" class="feedback" aria-live="polite"></p>
+                    <p class="requested-voltage">Última solicitação: <strong id="tensao-solicitada">—</strong></p>
+                </form>
             </section></div>
         </section>
         <section id="historico" class="page-section" aria-labelledby="titulo-historico">
