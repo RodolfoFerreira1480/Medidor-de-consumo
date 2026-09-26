@@ -30,7 +30,6 @@
             : dados?.controleTensao?.motivo || 'Aguardando a tensão máxima informada pelo ESP32.';
         atualizarCampos();
         if (disponivel) {
-            // Uma requisição HTTP travada também deve bloquear novos ajustes.
             expiracao = setTimeout(() => {
                 disponivel = false;
                 estado.textContent = 'Sem atualização do medidor. Aguarde uma nova leitura.';

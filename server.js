@@ -90,7 +90,6 @@ function numeroFinito(valor, padrao = 0) {
 
 function normalizarLeitura(dadosRecebidos) {
     const tensao = numeroFinito(dadosRecebidos.tensao);
-    // Ausencia de leitura nao equivale a uma saida medida em zero volts.
     const saidaRecebida = dadosRecebidos.tensaoSaida ?? dadosRecebidos.tensao_saida;
     const tensaoSaida = tensaoValida(saidaRecebida);
     const maxima = tensaoValida(dadosRecebidos.tensaoMaxima ?? dadosRecebidos.tensao_maxima);
@@ -265,7 +264,6 @@ mqttClient.on('message', async (topic, message, packet) => {
 
         try {
             const leitura = normalizarLeitura(dadosRecebidos);
-            // Atualiza a telemetria imediatamente, sem depender da latência do histórico.
             const limitePicoAtual = ultimoEstado.limitePico;
             const timestamp = new Date();
             leituraAoVivo = !packet?.retain;
