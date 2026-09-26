@@ -52,7 +52,7 @@ function mostrarMensagemLimite(texto, sucesso = true) {
 // 1. CONFIGURACAO DOS GRAFICOS (CHART.JS)
 // =====================================================
 
-Chart.defaults.color = '#6c736d';
+Chart.defaults.color = '#586f8a';
 Chart.defaults.font.family = '"Segoe UI", sans-serif';
 Chart.defaults.plugins.legend.display = false;
 Chart.defaults.animation = false;
@@ -66,8 +66,8 @@ const graficoPotencia = new Chart(ctx, {
         datasets: [{
             label: 'Potência (W)',
             data: [],
-            borderColor: '#28624c',
-            backgroundColor: 'rgba(40, 98, 76, 0.06)',
+            borderColor: '#2164cf',
+            backgroundColor: 'rgba(33, 100, 207, 0.09)',
             borderWidth: 2,
             fill: true,
             tension: 0.15,
@@ -79,7 +79,7 @@ const graficoPotencia = new Chart(ctx, {
         responsive: true,
         maintainAspectRatio: false,
         scales: {
-            y: { beginAtZero: true, grid: { color: '#e5e6df' } },
+            y: { beginAtZero: true, grid: { color: '#d5e2f1' } },
             x: { grid: { display: false } },
         },
     },
@@ -94,8 +94,8 @@ const graficoConsumo = new Chart(ctxDiario, {
         datasets: [{
             label: 'Consumo no período (kWh)',
             data: [],
-            borderColor: '#28624c',
-            backgroundColor: 'rgba(40, 98, 76, 0.06)',
+            borderColor: '#2164cf',
+            backgroundColor: 'rgba(33, 100, 207, 0.09)',
             borderWidth: 2,
             fill: true,
             tension: 0.15,
@@ -107,7 +107,7 @@ const graficoConsumo = new Chart(ctxDiario, {
         responsive: true,
         maintainAspectRatio: false,
         scales: {
-            y: { beginAtZero: true, grid: { color: '#e5e6df' } },
+            y: { beginAtZero: true, grid: { color: '#d5e2f1' } },
             x: { grid: { display: false } },
         },
     },
@@ -118,9 +118,9 @@ function gerarCoresConsumo(quantidade) {
     const coresBorda = [];
 
     for (let i = 0; i < quantidade; i++) {
-        const paleta = ['#28624c', '#658775', '#9eb3a1', '#bc9d62', '#d3c8a7', '#7b8982'];
+        const paleta = ['#2164cf', '#4989ec', '#7bb2fb', '#164a99', '#38a7d6', '#b1d3ff'];
         coresBackground.push(paleta[i % paleta.length]);
-        coresBorda.push('#fcfcf9');
+        coresBorda.push(document.documentElement?.dataset.theme === 'dark' ? '#10213a' : '#ffffff');
     }
 
     return { bg: coresBackground, border: coresBorda };
@@ -159,6 +159,29 @@ const pizzaMensal = new Chart(document.getElementById('pizzaMensal').getContext(
     ...configBasePizza,
     data: { labels: [], datasets: [{ data: [], borderWidth: 2 }] },
 });
+
+function atualizarTemaGraficos() {
+    const escuro = document.documentElement?.dataset.theme === 'dark';
+    const texto = escuro ? '#a1b6d3' : '#586f8a';
+    const linha = escuro ? '#29415f' : '#d5e2f1';
+    Chart.defaults.color = texto;
+    for (const grafico of [graficoPotencia, graficoConsumo]) {
+        grafico.data.datasets[0].borderColor = escuro ? '#84b8ff' : '#2164cf';
+        grafico.data.datasets[0].backgroundColor = escuro ? 'rgba(132, 184, 255, .1)' : 'rgba(33, 100, 207, .09)';
+        for (const eixo of Object.values(grafico.options.scales)) {
+            eixo.ticks = { ...eixo.ticks, color: texto };
+            eixo.grid.color = linha;
+            eixo.border = { color: linha };
+        }
+        grafico.update('none');
+    }
+    for (const grafico of [pizzaDiaria, pizzaSemanal, pizzaMensal]) {
+        grafico.data.datasets[0].borderColor = escuro ? '#10213a' : '#ffffff';
+        grafico.update('none');
+    }
+}
+window.addEventListener?.('themechange', atualizarTemaGraficos);
+atualizarTemaGraficos();
 
 // =====================================================
 // 2. FUNCOES DE COMUNICACAO COM O BACKEND (API)
@@ -227,6 +250,7 @@ async function atualizarDados() {
 
         const dados = await resposta.json();
         const potenciaAtual = numeroFinito(dados.potencia);
+        if (typeof window.atualizarControleTensao === 'function') window.atualizarControleTensao(dados);
         const emAlerta = Boolean(dados.statusAlerta) || potenciaAtual > limitePicoUI;
 
         atualizarStatusConexao(true);
@@ -253,6 +277,9 @@ async function atualizarDados() {
         adicionarPontoPotencia(dados.timestampLeitura || dados.timestamp, potenciaAtual);
     } catch (erro) {
         atualizarStatusConexao(false);
+        if (typeof window.atualizarControleTensao === 'function') {
+            window.atualizarControleTensao({ controleTensao: { motivo: 'Sem conexão com o servidor.' } });
+        }
     }
 }
 

@@ -5,23 +5,148 @@ const vm = require('node:vm');
 const path = require('node:path');
 
 function backend() {
-    const routes = {}, handlers = {}, queries = [];
-    const app = { use() {}, get(url, cb) { routes[url] = cb; }, post() {}, listen() {} };
+    const routes = {}, posts = {}, handlers = {}, queries = [], publishes = [];
+    const app = { use() {}, get(url, cb) { routes[url] = cb; }, post(url, cb) { posts[url] = cb; }, listen() {} };
     const express = Object.assign(() => app, { json() {}, static() {} });
     const pool = { async query(sql, values) {
         queries.push({ sql, values });
         return { rows: sql.includes('SELECT valor') ? [{ valor: '1000' }] : [] };
     } };
-    const mqtt = { connected: false, on(event, cb) { handlers[event] = cb; } };
+    const mqtt = { connected: false, on(event, cb) { handlers[event] = cb; },
+        publish(topic, message, options, callback) { publishes.push({ topic, message: JSON.parse(message), options }); callback(); } };
     const context = vm.createContext({
         require(name) {
             return { dotenv: { config() {} }, path, express, cors: () => {},
                 mqtt: { connect: () => mqtt }, pg: { Pool: function () { return pool; } } }[name];
         }, __dirname: path.resolve(__dirname, '..'), process: { env: {} }, console: { log() {}, error() {} },
+        setTimeout, clearTimeout,
     });
     vm.runInContext(fs.readFileSync(path.join(__dirname, '../server.js'), 'utf8'), context);
-    return { context, routes, handlers, queries };
+    return { context, routes, posts, handlers, queries, mqtt, publishes };
 }
+
+function response() {
+    return { code: 200, status(code) { this.code = code; return this; }, json(body) { this.body = body; } };
+}
+
+async function telemetria(b, dados = { tensaoMaxima: 24, tensaoSaida: 12.5 }, packet = {}) {
+    b.mqtt.connected = true;
+    await b.handlers.message('smart-meter/medidor/dados', Buffer.from(JSON.stringify(dados)), packet);
+}
+
+test('máximo aceita aliases e números válidos, rejeita valores ausentes ou inválidos', () => {
+    const { context: c } = backend();
+    assert.equal(c.normalizarLeitura({ tensaoMaxima: 24 }).tensaoMaxima, 24);
+    assert.equal(c.normalizarLeitura({ tensao_maxima: '24.5' }).tensaoMaxima, 24.5);
+    for (const value of [undefined, null, '', ' ', 'abc', 0, -1, Infinity, true, [], {}]) {
+        assert.equal(c.normalizarLeitura({ tensaoMaxima: value }).tensaoMaxima, null);
+    }
+});
+
+test('controle envia zero, frações e máximo via MQTT sem alterar a tensão medida', async () => {
+    const b = backend();
+    await telemetria(b);
+    for (const tensaoSaida of [0, 12.75, 24]) {
+        const res = response();
+        await b.posts['/api/tensao-saida']({ body: { tensaoSaida } }, res);
+        assert.equal(res.code, 200);
+        assert.equal(res.body.tensaoSolicitada, tensaoSaida);
+        const envio = b.publishes.at(-1);
+        assert.deepEqual(envio.message, { comando: 'ajustar_tensao', tensaoSaida });
+        assert.equal(envio.topic, 'smart-meter/medidor/comando');
+        assert.equal(envio.options.qos, 1);
+        assert.equal(envio.options.retain, false);
+    }
+    const status = response();
+    b.routes['/api/status']({}, status);
+    assert.equal(status.body.tensaoSaida, 12.5);
+    assert.equal(status.body.tensaoMaxima, 24);
+    assert.equal(status.body.controleTensao.disponivel, true);
+});
+
+test('API rejeita entradas inválidas e revalida o máximo que diminuiu', async () => {
+    const b = backend();
+    await telemetria(b);
+    for (const tensaoSaida of [undefined, null, '', ' ', true, [], {}, 'abc', -0.01, 24.01, Infinity]) {
+        const res = response();
+        await b.posts['/api/tensao-saida']({ body: { tensaoSaida } }, res);
+        assert.equal(res.code, 400);
+    }
+    await telemetria(b, { tensaoMaxima: 10 });
+    const res = response();
+    await b.posts['/api/tensao-saida']({ body: { tensaoSaida: 12 } }, res);
+    assert.equal(res.code, 400);
+    assert.equal(b.publishes.length, 0);
+});
+
+test('sem telemetria, sem máximo, desconectado, retido e expirado bloqueiam o ajuste', async () => {
+    const b = backend();
+    async function bloqueado() {
+        const res = response();
+        await b.posts['/api/tensao-saida']({ body: { tensaoSaida: 5 } }, res);
+        assert.equal(res.code, 503);
+    }
+    await bloqueado();
+    await telemetria(b, { tensaoSaida: 12 });
+    await bloqueado();
+    await telemetria(b);
+    b.mqtt.connected = false;
+    await bloqueado();
+    await telemetria(b, { tensaoMaxima: 24 }, { retain: true });
+    await bloqueado();
+    await telemetria(b);
+    vm.runInContext('ultimoEstado.timestampLeitura = new Date(Date.now() - 16000)', b.context);
+    await b.handlers.message('smart-meter/medidor/alerta', Buffer.from('Alerta recente'));
+    await bloqueado();
+    await telemetria(b);
+    b.handlers.close();
+    await bloqueado();
+    assert.equal(b.publishes.length, 0);
+});
+
+test('falha MQTT e envio simultâneo retornam erro; comandos existentes são preservados', async () => {
+    const b = backend();
+    await telemetria(b);
+    let confirmar;
+    b.mqtt.publish = (topic, message, options, cb) => { confirmar = cb; };
+    const primeira = response();
+    const pendente = b.posts['/api/tensao-saida']({ body: { tensaoSaida: 12 } }, primeira);
+    const segunda = response();
+    await b.posts['/api/tensao-saida']({ body: { tensaoSaida: 10 } }, segunda);
+    assert.equal(segunda.code, 409);
+    confirmar(new Error('Sem conexão'));
+    await pendente;
+    assert.equal(primeira.code, 503);
+    b.mqtt.publish = (topic, message, options, cb) => { b.publishes.push(JSON.parse(message)); cb(); };
+    for (const acao of ['ligar', 'desligar']) {
+        const res = response();
+        await b.posts['/api/comando']({ body: { acao } }, res);
+        assert.equal(res.code, 200);
+        assert.deepEqual(b.publishes.at(-1), { comando: acao });
+    }
+    const res = response();
+    await b.posts['/api/tensao-saida']({ body: { tensaoSaida: 10 } }, res);
+    assert.equal(res.code, 200);
+});
+
+test('broker sem confirmação não mantém a API bloqueada indefinidamente', async () => {
+    const b = backend();
+    await telemetria(b);
+    let expirar;
+    b.context.setTimeout = callback => { expirar = callback; return {}; };
+    b.context.clearTimeout = () => {};
+    b.mqtt.publish = () => {};
+    const res = response();
+    const pendente = b.posts['/api/tensao-saida']({ body: { tensaoSaida: 12 } }, res);
+    expirar();
+    await pendente;
+    assert.equal(res.code, 503);
+    assert.match(res.body.erro, /sem confirmação/);
+    b.mqtt.publish = (topic, message, options, cb) => cb();
+    const novo = response();
+    await b.posts['/api/tensao-saida']({ body: { tensaoSaida: 10 } }, novo);
+    assert.equal(novo.code, 200);
+});
 
 test('banco usa URL no Render, TLS no Supabase e rejeita host ausente em producao', () => {
     const { context: c } = backend();
