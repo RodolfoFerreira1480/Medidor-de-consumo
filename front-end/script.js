@@ -48,16 +48,11 @@ function mostrarMensagemLimite(texto, sucesso = true) {
     }, 2500);
 }
 
-// =====================================================
-// 1. CONFIGURACAO DOS GRAFICOS (CHART.JS)
-// =====================================================
-
 Chart.defaults.color = '#586f8a';
 Chart.defaults.font.family = '"Segoe UI", sans-serif';
 Chart.defaults.plugins.legend.display = false;
 Chart.defaults.animation = false;
 
-// Grafico de Linha (Potencia em Tempo Real)
 const ctx = document.getElementById('graficoPotencia').getContext('2d');
 const graficoPotencia = new Chart(ctx, {
     type: 'line',
@@ -85,7 +80,6 @@ const graficoPotencia = new Chart(ctx, {
     },
 });
 
-// Grafico de Linha (Consumo por Hora)
 const ctxDiario = document.getElementById('graficoConsumoDiario').getContext('2d');
 const graficoConsumo = new Chart(ctxDiario, {
     type: 'line',
@@ -126,7 +120,6 @@ function gerarCoresConsumo(quantidade) {
     return { bg: coresBackground, border: coresBorda };
 }
 
-// Configuracao base comum para as 3 pizzas
 const configBasePizza = {
     type: 'doughnut',
     options: {
@@ -144,7 +137,6 @@ const configBasePizza = {
     },
 };
 
-// Inicializando os 3 Graficos de Pizza
 const pizzaDiaria = new Chart(document.getElementById('pizzaDiaria').getContext('2d'), {
     ...configBasePizza,
     data: { labels: [], datasets: [{ data: [], borderWidth: 2 }] },
@@ -183,10 +175,6 @@ function atualizarTemaGraficos() {
 window.addEventListener?.('themechange', atualizarTemaGraficos);
 atualizarTemaGraficos();
 
-// =====================================================
-// 2. FUNCOES DE COMUNICACAO COM O BACKEND (API)
-// =====================================================
-
 function adicionarPontoPotencia(timestamp, potencia) {
     if (!timestamp || timestamp === ultimoTimestampGrafico) {
         return;
@@ -205,7 +193,6 @@ function adicionarPontoPotencia(timestamp, potencia) {
     graficoPotencia.update();
 }
 
-// Carrega o historico da linha do tempo inicial
 async function carregarHistoricoInicial() {
     try {
         const resposta = await fetch(apiUrl('/api/historico'));
@@ -242,7 +229,6 @@ async function carregarLimite() {
     }
 }
 
-// Busca os dados em tempo real para os cards e o grafico de linha
 async function atualizarDados() {
     try {
         const resposta = await fetch(apiUrl('/api/status'));
@@ -283,7 +269,6 @@ async function atualizarDados() {
     }
 }
 
-// Busca o consumo agrupado por hora
 async function carregarConsumoDiario() {
     try {
         const resposta = await fetch(apiUrl('/api/consumo-diario'));
@@ -300,7 +285,6 @@ async function carregarConsumoDiario() {
     }
 }
 
-// Busca a lista de picos de energia de hoje
 async function carregarPicos() {
     try {
         const resposta = await fetch(apiUrl('/api/picos'));
@@ -336,7 +320,6 @@ async function carregarPicos() {
     }
 }
 
-// Envia comandos de controle para o ESP32 (reles)
 async function enviarComando(acao) {
     const feedback = document.getElementById('feedback-comando');
     feedback.textContent = `Enviando comando '${acao}'...`;
@@ -403,17 +386,14 @@ function preencherPizza(grafico, dados, campoLabel, idTotal) {
     grafico.data.datasets[0].borderColor = cores.border;
     grafico.update();
 
-    // Soma o total de consumo e injeta no centro do gráfico (HTML)
     if (idTotal) {
         const total = dados.reduce((acc, curr) => acc + numeroFinito(curr.consumo_total), 0);
         document.getElementById(idTotal).textContent = formatarNumero(total, 1);
     }
 }
 
-// Nas chamadas dentro da função carregarPizzas(), adicione o ID do elemento central:
 async function carregarPizzas() {
     try {
-        // ... (Mantenha os fetch() originais) ...
         const [resDiaria, resSemanal, resMensal] = await Promise.all([
             fetch(apiUrl('/api/consumo-diario')),
             fetch(apiUrl('/api/consumo-semanal')),
@@ -426,7 +406,6 @@ async function carregarPizzas() {
             resDiaria.json(), resSemanal.json(), resMensal.json(),
         ]);
 
-        // Adicionando os IDs correspondentes ao centro das pizzas
         preencherPizza(pizzaDiaria, dadosDiaria, 'horario', 'total-dia');
         preencherPizza(pizzaSemanal, dadosSemanal, 'data', 'total-semana');
         preencherPizza(pizzaMensal, dadosMensal, 'data', 'total-mes');
@@ -434,10 +413,6 @@ async function carregarPizzas() {
         console.error('Erro ao carregar graficos de pizza:', e);
     }
 }
-
-// =====================================================
-// 3. INICIALIZACAO E ATUALIZACOES AUTOMATICAS
-// =====================================================
 
 async function iniciarPainel() {
     await carregarLimite();
@@ -452,15 +427,12 @@ async function iniciarPainel() {
 
 iniciarPainel();
 
-// Atualiza os cards e o grafico de linha a cada 2 segundos
 setInterval(atualizarDados, 2000);
 
-// Atualiza o grafico de consumo por hora, picos e pizzas a cada 5 segundos
 setInterval(() => {
     carregarConsumoDiario();
     carregarPicos();
     carregarPizzas();
 }, 5000);
 
-// Ativa os ícones na tela (Isso conserta os quadrados vazios!)
 lucide.createIcons();

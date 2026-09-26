@@ -13,7 +13,6 @@ app.use(express.static(path.join(__dirname, 'front-end')));
 const LIMITE_PICO_PADRAO = Number(process.env.LIMITE_PICO_PADRAO) || 1000;
 const VALIDADE_LEITURA_MS = 15000;
 
-// DATABASE_URL tem prioridade; DB_* continua disponivel para configuracao local.
 function configurarBanco(env) {
     const connectionString = env.DATABASE_URL?.trim();
     const host = env.DB_HOST?.trim();
@@ -27,7 +26,6 @@ function configurarBanco(env) {
         database: env.DB_DATABASE,
         port: Number(env.DB_PORT) || 5432,
     };
-    // TLS com validacao do certificado para conexoes hospedadas.
     const usarSSL = env.DB_SSL === 'true' || (env.DB_SSL !== 'false'
         && (Boolean(env.RENDER) || /supabase\.(com|co)([/:?]|$)/i.test(connectionString || host || '')));
     config.ssl = usarSSL ? {
@@ -40,7 +38,6 @@ function configurarBanco(env) {
 
 const pool = new Pool(configurarBanco(process.env));
 
-// --- CONFIGURACAO DO MQTT USANDO .ENV ---
 const MQTT_BROKER = process.env.MQTT_BROKER || 'mqtt://broker.hivemq.com:1883';
 const TOPIC_DADOS = process.env.MQTT_TOPIC_DADOS || 'smart-meter/medidor/dados';
 const TOPIC_COMANDO = process.env.MQTT_TOPIC_COMANDO || 'smart-meter/medidor/comando';
@@ -250,7 +247,6 @@ mqttClient.on('error', (err) => {
 // A reconexão exige nova telemetria; uma mensagem retida não prova que o ESP32 está online.
 mqttClient.on('close', () => { leituraAoVivo = false; });
 
-// Recebendo mensagens do ESP32
 mqttClient.on('message', async (topic, message, packet) => {
     const payload = message.toString();
 
@@ -308,8 +304,6 @@ mqttClient.on('message', async (topic, message, packet) => {
     }
 });
 
-// --- ROTAS DA API HTTP ---
-
 app.get('/api/status', (req, res) => {
     res.set?.('Cache-Control', 'no-store');
     res.json({ ...ultimoEstado, controleTensao: estadoControleTensao() });
@@ -338,7 +332,6 @@ app.post('/api/tensao-saida', async (req, res) => {
     }
 });
 
-// Rota para o site buscar o historico do PostgreSQL
 app.get('/api/historico', async (req, res) => {
     try {
         const query = `SELECT *, tensao_saida AS "tensaoSaida" FROM historico ORDER BY timestamp DESC LIMIT 50`;
@@ -349,7 +342,6 @@ app.get('/api/historico', async (req, res) => {
     }
 });
 
-// Rota para o Grafico Diario (consumo real por hora)
 app.get('/api/consumo-diario', async (req, res) => {
     try {
         const query = consultaDeltaConsumo({
@@ -367,7 +359,6 @@ app.get('/api/consumo-diario', async (req, res) => {
     }
 });
 
-// Rota para o Consumo Semanal (ultimos 7 dias incluindo hoje)
 app.get('/api/consumo-semanal', async (req, res) => {
     try {
         const query = consultaDeltaConsumo({
@@ -385,7 +376,6 @@ app.get('/api/consumo-semanal', async (req, res) => {
     }
 });
 
-// Rota para o Consumo Mensal (mes atual)
 app.get('/api/consumo-mensal', async (req, res) => {
     try {
         const query = consultaDeltaConsumo({
@@ -403,7 +393,6 @@ app.get('/api/consumo-mensal', async (req, res) => {
     }
 });
 
-// Rota para o Historico de Picos de Energia
 app.get('/api/picos', async (req, res) => {
     try {
         const limitePicoAtual = await buscarLimitePico();
@@ -425,7 +414,6 @@ app.get('/api/picos', async (req, res) => {
     }
 });
 
-// Rota para o site consultar qual e o limite salvo no banco
 app.get('/api/config/limite', async (req, res) => {
     try {
         const limite = await buscarLimitePico();
@@ -435,7 +423,6 @@ app.get('/api/config/limite', async (req, res) => {
     }
 });
 
-// Rota para atualizar e salvar o novo limite permanentemente no banco
 app.post('/api/config/limite', async (req, res) => {
     const novoLimiteNumero = Number(req.body.novoLimite);
 

@@ -72,4 +72,4 @@ acompanha o tema do sistema. Gráficos, campos, alertas e navegação também mu
 Execute `npm test` para os testes de regressão. As verificações automatizadas
 usam MQTT e banco simulados e não enviam comandos ao medidor físico. Para rodar
 o site, instale as dependências com `npm ci`, configure o `.env` local e execute
-`npm start`. Confira também `RENDER.md` para a configuração do banco hospedado.
+`npm start`.
