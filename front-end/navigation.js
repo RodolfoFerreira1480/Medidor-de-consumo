@@ -1,7 +1,7 @@
 const linksSecoes = [...document.querySelectorAll('.nav-link')];
 const secoesPainel = [...document.querySelectorAll('.page-section')];
 function destacarSecao(id) {
-    linksSecoes.forEach(link => {
+    linksSecoes.forEach((link) => {
         const ativo = link.hash === `#${id}`;
         link.classList.toggle('is-active', ativo);
         if (ativo) link.setAttribute('aria-current', 'location');
@@ -20,14 +20,18 @@ function atualizarSecaoVisivel() {
     if (atual) destacarSecao(atual.id);
 }
 let atualizacaoPendente = false;
-window.addEventListener('scroll', () => {
-    if (atualizacaoPendente) return;
-    atualizacaoPendente = true;
-    requestAnimationFrame(() => {
-        atualizarSecaoVisivel();
-        atualizacaoPendente = false;
-    });
-}, { passive: true });
+window.addEventListener(
+    'scroll',
+    () => {
+        if (atualizacaoPendente) return;
+        atualizacaoPendente = true;
+        requestAnimationFrame(() => {
+            atualizarSecaoVisivel();
+            atualizacaoPendente = false;
+        });
+    },
+    { passive: true },
+);
 window.addEventListener('resize', atualizarSecaoVisivel);
 window.addEventListener('load', atualizarSecaoVisivel);
 atualizarSecaoVisivel();

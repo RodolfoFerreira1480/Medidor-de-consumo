@@ -3,7 +3,9 @@
     const chave = 'energia-tema';
     const sistema = window.matchMedia('(prefers-color-scheme: dark)');
     let preferencia;
-    try { preferencia = localStorage.getItem(chave); } catch { /* Armazenamento indisponível. */ }
+    try {
+        preferencia = localStorage.getItem(chave);
+    } catch {}
     if (!['light', 'dark'].includes(preferencia)) preferencia = null;
 
     function aplicar(tema) {
@@ -17,12 +19,16 @@
 
     window.alternarTema = () => {
         preferencia = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
-        try { localStorage.setItem(chave, preferencia); } catch { /* O botão continua funcionando. */ }
+        try {
+            localStorage.setItem(chave, preferencia);
+        } catch {}
         aplicar(preferencia);
     };
     aplicar(preferencia || (sistema.matches ? 'dark' : 'light'));
-    document.addEventListener('DOMContentLoaded', () => aplicar(document.documentElement.dataset.theme));
-    sistema.addEventListener('change', evento => {
+    document.addEventListener('DOMContentLoaded', () =>
+        aplicar(document.documentElement.dataset.theme),
+    );
+    sistema.addEventListener('change', (evento) => {
         if (!preferencia) aplicar(evento.matches ? 'dark' : 'light');
     });
 })();

@@ -1,235 +1,503 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Energia · Monitor de consumo</title>
-    <script src="theme.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <link rel="stylesheet" href="index.css">
-</head>
-<body>
-    <a class="skip-link" href="#visao-geral">Ir para o conteúdo</a>
-    <aside class="sidebar">
-        <a class="brand" href="#visao-geral"><span class="brand-mark"><i data-lucide="zap" aria-hidden="true"></i></span><span><strong>Energia</strong><small>Monitor de consumo</small></span></a>
-        <nav aria-label="Seções do monitor">
-            <a class="nav-link is-active" href="#visao-geral" aria-current="location">Visão geral</a>
-            <a class="nav-link" href="#historico">Histórico</a>
-            <a class="nav-link" href="#eventos">Eventos</a>
-            <a class="nav-link" href="#configuracoes">Configurações</a>
-        </nav>
-        <button id="theme-toggle" class="theme-toggle" type="button" aria-pressed="false" onclick="alternarTema()"><span aria-hidden="true">◐</span><span id="theme-label">Ativar modo escuro</span></button>
-        <div class="device"><div class="device-heading"><span class="device-icon"><i data-lucide="cpu" aria-hidden="true"></i></span><div><strong>Medidor principal</strong><small>ESP32 · MQTT</small></div></div><div role="status" id="status-conexao" class="status-pill">Desconectado do Servidor</div></div>
-    </aside>
-    <main class="dashboard" id="conteudo">
-        <section id="visao-geral" class="page-section" aria-labelledby="titulo-visao">
-            <header class="page-header"><div><p class="eyebrow">OPERAÇÃO EM TEMPO REAL</p><h1 id="titulo-visao">Monitor de consumo</h1><p class="description">Acompanhe a carga, o consumo acumulado e os eventos do sistema.</p></div><div class="last-reading"><span>ÚLTIMA LEITURA</span><p id="ultima-leitura">Aguardando dados</p></div></header>
-            <section id="alerta-pico" class="alert-banner hidden" aria-live="polite">
-            <div class="alert-icon" aria-hidden="true">
-                <i data-lucide="triangle-alert"></i>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Energia · Monitor de consumo</title>
+        <script src="theme.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <script src="https://unpkg.com/lucide@latest"></script>
+        <link rel="stylesheet" href="index.css" />
+    </head>
+    <body>
+        <a class="skip-link" href="#visao-geral">Ir para o conteúdo</a>
+        <aside class="sidebar">
+            <a class="brand" href="#visao-geral">
+                <span class="brand-mark"><i data-lucide="zap" aria-hidden="true"></i></span>
+                <span>
+                    <strong>Energia</strong>
+                    <small>Monitor de consumo</small>
+                </span>
+            </a>
+            <nav aria-label="Seções do monitor">
+                <a class="nav-link is-active" href="#visao-geral" aria-current="location">
+                    Visão geral
+                </a>
+                <a class="nav-link" href="#historico">Histórico</a>
+                <a class="nav-link" href="#eventos">Eventos</a>
+                <a class="nav-link" href="#configuracoes">Configurações</a>
+            </nav>
+            <button
+                id="theme-toggle"
+                class="theme-toggle"
+                type="button"
+                aria-pressed="false"
+                onclick="alternarTema()"
+            >
+                <span aria-hidden="true">◐</span>
+                <span id="theme-label">Ativar modo escuro</span>
+            </button>
+            <div class="device">
+                <div class="device-heading">
+                    <span class="device-icon"><i data-lucide="cpu" aria-hidden="true"></i></span>
+                    <div>
+                        <strong>Medidor principal</strong>
+                        <small>ESP32 · MQTT</small>
+                    </div>
+                </div>
+                <div role="status" id="status-conexao" class="status-pill">
+                    Desconectado do Servidor
+                </div>
             </div>
-            <div>
-                <strong>Atenção! Pico de Energia Detectado</strong>
-                <span>O limite seguro foi excedido e a proteção pode acionar o desarme.</span>
-            </div>
-        </section>
-            <div class="metrics-grid" aria-label="Medições em tempo real"><article class="panel metric-card">
-                    <div class="metric-icon power" aria-hidden="true">
-                        <i data-lucide="zap"></i>
+        </aside>
+        <main class="dashboard" id="conteudo">
+            <section id="visao-geral" class="page-section" aria-labelledby="titulo-visao">
+                <header class="page-header">
+                    <div>
+                        <p class="eyebrow">OPERAÇÃO EM TEMPO REAL</p>
+                        <h1 id="titulo-visao">Monitor de consumo</h1>
+                        <p class="description">
+                            Acompanhe a carga, o consumo acumulado e os eventos do sistema.
+                        </p>
+                    </div>
+                    <div class="last-reading">
+                        <span>ÚLTIMA LEITURA</span>
+                        <p id="ultima-leitura">Aguardando dados</p>
+                    </div>
+                </header>
+                <section id="alerta-pico" class="alert-banner hidden" aria-live="polite">
+                    <div class="alert-icon" aria-hidden="true">
+                        <i data-lucide="triangle-alert"></i>
                     </div>
                     <div>
-                        <p class="metric-label">Potência Atual</p>
-                        <p id="val-potencia" class="metric-value text-blue">0 <span class="metric-unit">W</span></p>
+                        <strong>Atenção! Pico de Energia Detectado</strong>
+                        <span>
+                            O limite seguro foi excedido e a proteção pode acionar o desarme.
+                        </span>
                     </div>
-                <p class="metric-hint">Carga instantânea do sistema</p></article>
-<article class="panel metric-card">
-                    <div class="metric-icon voltage" aria-hidden="true">
-                        <i data-lucide="bolt"></i>
-                    </div>
-                    <div>
-                        <p class="metric-label">Tensão de entrada</p>
-                        <p id="val-tensao" class="metric-value text-yellow">0 <span class="metric-unit">V</span></p>
-                    </div>
-                <p class="metric-hint">Valor medido na entrada</p></article>
-<article class="panel metric-card">
-                    <div>
-                        <p class="metric-label">Tensão de saída</p>
-                        <p id="val-tensao-saida" class="metric-value" title="Leitura ainda não recebida">— <span class="metric-unit">V</span></p>
-                    </div>
-                <p class="metric-hint">Valor medido na saída</p></article>
-<article class="panel metric-card">
-                    <div class="metric-icon current" aria-hidden="true">
-                        <i data-lucide="activity"></i>
-                    </div>
-                    <div>
-                        <p class="metric-label">Corrente</p>
-                        <p id="val-corrente" class="metric-value text-red">0 <span class="metric-unit">A</span></p>
-                    </div>
-                <p class="metric-hint">Corrente instantânea</p></article>
-<article class="panel metric-card">
-                    <div class="metric-icon" aria-hidden="true">
-                        <i data-lucide="zap"></i>
-                    </div>
-                    <div>
-                        <p class="metric-label">Consumo Total</p>
-                        <p id="val-kwh" class="metric-value">0 <span class="metric-unit">kWh</span></p>
-                    </div>
-                <p class="metric-hint">Total informado pelo medidor</p></article></div>
-            <div class="main-grid"><section class="panel chart-panel">
-                <div class="chart-header">
-                    <div><p class="eyebrow">TEMPO REAL</p><h2 class="panel-title">Histórico de potência</h2></div>
-                    <span class="chart-badge">Atualização automática</span>
+                </section>
+                <div class="metrics-grid" aria-label="Medições em tempo real">
+                    <article class="panel metric-card">
+                        <div class="metric-icon power" aria-hidden="true">
+                            <i data-lucide="zap"></i>
+                        </div>
+                        <div>
+                            <p class="metric-label">Potência Atual</p>
+                            <p id="val-potencia" class="metric-value text-blue">
+                                0
+                                <span class="metric-unit">W</span>
+                            </p>
+                        </div>
+                        <p class="metric-hint">Carga instantânea do sistema</p>
+                    </article>
+                    <article class="panel metric-card">
+                        <div class="metric-icon voltage" aria-hidden="true">
+                            <i data-lucide="bolt"></i>
+                        </div>
+                        <div>
+                            <p class="metric-label">Tensão de entrada</p>
+                            <p id="val-tensao" class="metric-value text-yellow">
+                                0
+                                <span class="metric-unit">V</span>
+                            </p>
+                        </div>
+                        <p class="metric-hint">Valor medido na entrada</p>
+                    </article>
+                    <article class="panel metric-card">
+                        <div>
+                            <p class="metric-label">Tensão de saída</p>
+                            <p
+                                id="val-tensao-saida"
+                                class="metric-value"
+                                title="Leitura ainda não recebida"
+                            >
+                                —
+                                <span class="metric-unit">V</span>
+                            </p>
+                        </div>
+                        <p class="metric-hint">Valor medido na saída</p>
+                    </article>
+                    <article class="panel metric-card">
+                        <div class="metric-icon current" aria-hidden="true">
+                            <i data-lucide="activity"></i>
+                        </div>
+                        <div>
+                            <p class="metric-label">Corrente</p>
+                            <p id="val-corrente" class="metric-value text-red">
+                                0
+                                <span class="metric-unit">A</span>
+                            </p>
+                        </div>
+                        <p class="metric-hint">Corrente instantânea</p>
+                    </article>
+                    <article class="panel metric-card">
+                        <div class="metric-icon" aria-hidden="true">
+                            <i data-lucide="zap"></i>
+                        </div>
+                        <div>
+                            <p class="metric-label">Consumo Total</p>
+                            <p id="val-kwh" class="metric-value">
+                                0
+                                <span class="metric-unit">kWh</span>
+                            </p>
+                        </div>
+                        <p class="metric-hint">Total informado pelo medidor</p>
+                    </article>
                 </div>
-                <div class="chart-frame">
-                    <canvas id="graficoPotencia"></canvas>
-                </div>
-            </section><section class="panel control-panel">
-                <p class="eyebrow">CONTROLE</p><h2 class="panel-title">Alimentação</h2><p class="description">Envie um comando para a saída do medidor.</p>
-                <div class="control-actions">
-                    <button class="action-button primary" type="button" onclick="enviarComando('ligar')">
-                        <i data-lucide="power"></i>
-                        <span>Ligar saída</span>
-                    </button>
-                    <button class="action-button danger" type="button" onclick="enviarComando('desligar')">
-                        <i data-lucide="power-off"></i>
-                        <span>Desligar saída</span>
-                    </button>
-                </div>
-                <p aria-live="polite" id="feedback-comando" class="feedback"></p>
-                <form id="form-tensao" class="voltage-form">
-                    <h3 class="voltage-heading">Ajuste da tensão de saída</h3>
-                    <div class="voltage-limit"><span>Tensão máxima do ESP32</span><strong id="val-tensao-maxima">— <span class="metric-unit">V</span></strong></div>
-                    <label class="config-label" for="input-tensao">Tensão desejada (V)</label>
-                    <div class="voltage-apply-row">
-                        <div class="voltage-input-row"><input class="limit-input" type="number" id="input-tensao" min="0" step="any" placeholder="0,00" required disabled aria-describedby="estado-tensao"><span>V</span></div>
-                        <button id="aplicar-tensao" class="action-button primary" type="submit" disabled aria-label="Aplicar tensão">Aplicar</button>
-                    </div>
-                    <input id="range-tensao" class="voltage-range" type="range" min="0" max="0" step="0.01" value="0" disabled aria-label="Ajustar tensão desejada em volts">
-                    <div class="range-labels" aria-hidden="true"><span>0 V</span><span id="range-maximo">— V</span></div>
-                    <p id="estado-tensao" class="control-state" role="status">Aguardando a tensão máxima informada pelo ESP32.</p>
-                    <p id="feedback-tensao" class="feedback" aria-live="polite"></p>
-                    <p class="requested-voltage">Última solicitação: <strong id="tensao-solicitada">—</strong></p>
-                </form>
-            </section></div>
-        </section>
-        <section id="historico" class="page-section" aria-labelledby="titulo-historico">
-            <header class="section-heading"><p class="eyebrow">HISTÓRICO</p><h2 id="titulo-historico">Consumo por período</h2><p class="description">Veja a distribuição do consumo ao longo das horas e dos dias.</p></header>
-            <section class="panel side-chart">
-                <div class="chart-header">
-                    <h2 class="panel-title">Consumo por hora</h2>
-                </div>
-                <div class="chart-frame">
-                    <canvas id="graficoConsumoDiario"></canvas>
-                </div>
-            </section>
-            <div class="summary-grid"><section class="panel donut-panel">
-                <h2 class="donut-title">Hoje</h2>
-                <div class="donut-wrap">
-                    <canvas id="pizzaDiaria"></canvas>
-                    <div class="donut-center">
-                        <strong id="total-dia">0</strong>
-                        <span>kWh</span>
-                    </div>
-                </div>
-                <div id="bars-dia" class="mini-bars" aria-hidden="true"></div>
-                <div class="cost-summary"><span>Custo estimado</span><strong id="custo-dia">—</strong></div>
-            </section>
-<section class="panel donut-panel">
-                <h2 class="donut-title">Nesta semana</h2>
-                <div class="donut-wrap">
-                    <canvas id="pizzaSemanal"></canvas>
-                    <div class="donut-center">
-                        <strong id="total-semana">0</strong>
-                        <span>kWh</span>
-                    </div>
-                </div>
-                <div id="bars-semana" class="mini-bars" aria-hidden="true"></div>
-                <div class="cost-summary"><span>Custo estimado</span><strong id="custo-semana">—</strong></div>
-            </section>
-<section class="panel donut-panel">
-                <h2 class="donut-title">Neste mês</h2>
-                <div class="donut-wrap">
-                    <canvas id="pizzaMensal"></canvas>
-                    <div class="donut-center">
-                        <strong id="total-mes">0</strong>
-                        <span>kWh</span>
-                    </div>
-                </div>
-                <div id="bars-mes" class="mini-bars" aria-hidden="true"></div>
-                <div class="cost-summary"><span>Custo estimado</span><strong id="custo-mes">—</strong></div>
-            </section></div>
-            <p id="resumo-custos" class="cost-note" role="status">Configure a tarifa de energia para estimar os custos.</p>
-            <a class="cost-config-link" href="#tarifa-energia">Configurar tarifa de energia</a>
-        </section>
-        <section id="eventos" class="page-section" aria-labelledby="titulo-eventos">
-            <header class="section-heading"><p class="eyebrow">EVENTOS</p><h2 id="titulo-eventos">Ocorrências do sistema</h2><p class="description">Picos de potência registrados hoje acima do limite configurado.</p></header>
-            <section class="panel peak-panel">
-                <h2 id="titulo-picos" class="panel-title">
-                    <i data-lucide="triangle-alert"></i>
-                    Picos acima de 1.000 W
-                </h2>
-                <ul id="listaPicos" class="peak-list">
-                    <li class="empty-state">Nenhum pico registrado hoje.</li>
-                </ul>
-            </section>
-        </section>
-        <section id="configuracoes" class="page-section" aria-labelledby="titulo-configuracoes">
-            <header class="section-heading"><p class="eyebrow">CONFIGURAÇÕES</p><h2 id="titulo-configuracoes">Parâmetros do medidor</h2><p class="description">Defina o limite de potência e a tarifa usada na estimativa de custos.</p></header>
-            <section class="panel config-panel">
-                <h2 class="panel-title">
-                    <i data-lucide="settings"></i>
-                    Limite de pico
-                </h2>
-                <label class="config-label" for="input-limite">
-                    <span>Potência em watts</span>
-                    </label>
-                <div class="config-row">
-                    <input class="limit-input" type="number" id="input-limite" value="1000" min="1" step="1">
-                    <button class="save-button" type="button" onclick="salvarNovoLimite()">Salvar</button>
-                </div>
-                <p aria-live="polite" id="msg-limite" class="limit-message"></p>
-            </section>
-            <section id="tarifa-energia" class="panel config-panel tariff-panel" aria-labelledby="titulo-tarifa">
-                <h2 id="titulo-tarifa" class="panel-title"><i data-lucide="wallet" aria-hidden="true"></i>Tarifa de energia</h2>
-                <p class="description">Selecione sua localidade e distribuidora ou informe o preço por kWh da sua conta.</p>
-                <form id="form-tarifa" novalidate>
-                    <fieldset id="tarifa-campos" disabled>
-                        <legend class="sr-only">Configuração da tarifa</legend>
-                        <label class="config-label" for="tarifa-modo">Como definir a tarifa</label>
-                        <select id="tarifa-modo" class="limit-input">
-                            <option value="localidade">Por localidade (ANEEL)</option>
-                            <option value="manual">Informar valor da conta</option>
-                        </select>
-                        <div id="tarifa-localidade" class="tariff-fields">
-                            <div class="tariff-location-row">
-                                <div><label class="config-label" for="tarifa-uf">Estado</label><select id="tarifa-uf" class="limit-input" required><option value="">Selecione o estado</option></select></div>
-                                <div><label class="config-label" for="tarifa-municipio">Cidade (opcional)</label><select id="tarifa-municipio" class="limit-input" disabled><option value="">Todo o estado</option></select></div>
+                <div class="main-grid">
+                    <section class="panel chart-panel">
+                        <div class="chart-header">
+                            <div>
+                                <p class="eyebrow">TEMPO REAL</p>
+                                <h2 class="panel-title">Histórico de potência</h2>
                             </div>
-                            <div><label class="config-label" for="tarifa-distribuidora">Distribuidora da sua conta</label><select id="tarifa-distribuidora" class="limit-input" required disabled><option value="">Selecione o estado primeiro</option></select></div>
-                            <p class="tariff-help">A tarifa varia por distribuidora. A cidade ajuda a filtrar as opções; confira o nome na sua conta de energia.</p>
-                            <div class="tariff-preview"><span>Tarifa da seleção</span><strong id="tarifa-previa">—</strong><p id="tarifa-vigencia-previa">Selecione uma distribuidora.</p></div>
-                            <p id="tarifa-fonte" class="tariff-help">Fonte: ANEEL · tarifa residencial convencional.</p>
-                            <p id="tarifa-catalogo-aviso" class="tariff-help" role="status"></p>
+                            <span class="chart-badge">Atualização automática</span>
                         </div>
-                        <div id="tarifa-manual" class="tariff-fields" hidden>
-                            <div><label class="config-label" for="tarifa-valor">Preço da energia (R$/kWh)</label><input id="tarifa-valor" class="limit-input" type="text" inputmode="decimal" autocomplete="off" placeholder="Ex.: 0,850000" aria-describedby="tarifa-ajuda-manual" disabled></div>
-                            <p id="tarifa-ajuda-manual" class="tariff-help">Use o preço por kWh da sua conta, maior que zero, com até 6 casas decimais. O limite é R$ 100/kWh.</p>
+                        <div class="chart-frame">
+                            <canvas id="graficoPotencia"></canvas>
                         </div>
-                        <button id="salvar-tarifa" class="save-button tariff-save" type="submit">Salvar tarifa</button>
-                    </fieldset>
-                    <p id="feedback-tarifa" class="feedback" aria-live="polite">Carregando configuração…</p>
-                    <button id="recarregar-tarifa" class="save-button tariff-save" type="button" hidden>Tentar novamente</button>
-                </form>
-                <div class="tariff-saved"><span>Tarifa salva para o cálculo</span><strong id="tarifa-salva">Nenhuma tarifa configurada</strong><p id="tarifa-salva-detalhes">Os custos aparecerão após salvar uma tarifa.</p></div>
-                <p id="tarifa-aviso" class="tariff-help">Estimativa = consumo medido × tarifa salva, aplicada a todo o período. As tarifas ANEEL são residenciais convencionais, sem impostos, bandeiras tarifárias ou iluminação pública; o valor não representa a conta final.</p>
+                    </section>
+                    <section class="panel control-panel">
+                        <p class="eyebrow">CONTROLE</p>
+                        <h2 class="panel-title">Alimentação</h2>
+                        <p class="description">Envie um comando para a saída do medidor.</p>
+                        <div class="control-actions">
+                            <button
+                                class="action-button primary"
+                                type="button"
+                                onclick="enviarComando('ligar')"
+                            >
+                                <i data-lucide="power"></i>
+                                <span>Ligar saída</span>
+                            </button>
+                            <button
+                                class="action-button danger"
+                                type="button"
+                                onclick="enviarComando('desligar')"
+                            >
+                                <i data-lucide="power-off"></i>
+                                <span>Desligar saída</span>
+                            </button>
+                        </div>
+                        <p aria-live="polite" id="feedback-comando" class="feedback"></p>
+                        <form id="form-tensao" class="voltage-form">
+                            <h3 class="voltage-heading">Ajuste da tensão de saída</h3>
+                            <div class="voltage-limit">
+                                <span>Tensão máxima do ESP32</span>
+                                <strong id="val-tensao-maxima">
+                                    —
+                                    <span class="metric-unit">V</span>
+                                </strong>
+                            </div>
+                            <label class="config-label" for="input-tensao">
+                                Tensão desejada (V)
+                            </label>
+                            <div class="voltage-apply-row">
+                                <div class="voltage-input-row">
+                                    <input
+                                        class="limit-input"
+                                        type="number"
+                                        id="input-tensao"
+                                        min="0"
+                                        step="any"
+                                        placeholder="0,00"
+                                        required
+                                        disabled
+                                        aria-describedby="estado-tensao"
+                                    />
+                                    <span>V</span>
+                                </div>
+                                <button
+                                    id="aplicar-tensao"
+                                    class="action-button primary"
+                                    type="submit"
+                                    disabled
+                                    aria-label="Aplicar tensão"
+                                >
+                                    Aplicar
+                                </button>
+                            </div>
+                            <input
+                                id="range-tensao"
+                                class="voltage-range"
+                                type="range"
+                                min="0"
+                                max="0"
+                                step="0.01"
+                                value="0"
+                                disabled
+                                aria-label="Ajustar tensão desejada em volts"
+                            />
+                            <div class="range-labels" aria-hidden="true">
+                                <span>0 V</span>
+                                <span id="range-maximo">— V</span>
+                            </div>
+                            <p id="estado-tensao" class="control-state" role="status">
+                                Aguardando a tensão máxima informada pelo ESP32.
+                            </p>
+                            <p id="feedback-tensao" class="feedback" aria-live="polite"></p>
+                            <p class="requested-voltage">
+                                Última solicitação:
+                                <strong id="tensao-solicitada">—</strong>
+                            </p>
+                        </form>
+                    </section>
+                </div>
             </section>
-        </section>
-        <footer class="footer"><span>Energia / Monitor DC</span><span>Leituras atualizadas a cada 2 segundos</span></footer>
-    </main>
-    <script src="controle-tensao.js"></script>
-    <script src="custos.js"></script>
-    <script src="script.js"></script>
-    <script src="navigation.js"></script>
-</body>
+            <section id="historico" class="page-section" aria-labelledby="titulo-historico">
+                <header class="section-heading">
+                    <p class="eyebrow">HISTÓRICO</p>
+                    <h2 id="titulo-historico">Consumo por período</h2>
+                    <p class="description">
+                        Veja a distribuição do consumo ao longo das horas e dos dias.
+                    </p>
+                </header>
+                <section class="panel side-chart">
+                    <div class="chart-header">
+                        <h2 class="panel-title">Consumo por hora</h2>
+                    </div>
+                    <div class="chart-frame">
+                        <canvas id="graficoConsumoDiario"></canvas>
+                    </div>
+                </section>
+                <div class="summary-grid">
+                    <section class="panel donut-panel">
+                        <h2 class="donut-title">Hoje</h2>
+                        <div class="donut-wrap">
+                            <canvas id="pizzaDiaria"></canvas>
+                            <div class="donut-center">
+                                <strong id="total-dia">0</strong>
+                                <span>kWh</span>
+                            </div>
+                        </div>
+                        <div id="bars-dia" class="mini-bars" aria-hidden="true"></div>
+                        <div class="cost-summary">
+                            <span>Custo estimado</span>
+                            <strong id="custo-dia">—</strong>
+                        </div>
+                    </section>
+                    <section class="panel donut-panel">
+                        <h2 class="donut-title">Nesta semana</h2>
+                        <div class="donut-wrap">
+                            <canvas id="pizzaSemanal"></canvas>
+                            <div class="donut-center">
+                                <strong id="total-semana">0</strong>
+                                <span>kWh</span>
+                            </div>
+                        </div>
+                        <div id="bars-semana" class="mini-bars" aria-hidden="true"></div>
+                        <div class="cost-summary">
+                            <span>Custo estimado</span>
+                            <strong id="custo-semana">—</strong>
+                        </div>
+                    </section>
+                    <section class="panel donut-panel">
+                        <h2 class="donut-title">Neste mês</h2>
+                        <div class="donut-wrap">
+                            <canvas id="pizzaMensal"></canvas>
+                            <div class="donut-center">
+                                <strong id="total-mes">0</strong>
+                                <span>kWh</span>
+                            </div>
+                        </div>
+                        <div id="bars-mes" class="mini-bars" aria-hidden="true"></div>
+                        <div class="cost-summary">
+                            <span>Custo estimado</span>
+                            <strong id="custo-mes">—</strong>
+                        </div>
+                    </section>
+                </div>
+                <p id="resumo-custos" class="cost-note" role="status">
+                    Configure a tarifa de energia para estimar os custos.
+                </p>
+                <a class="cost-config-link" href="#tarifa-energia">Configurar tarifa de energia</a>
+            </section>
+            <section id="eventos" class="page-section" aria-labelledby="titulo-eventos">
+                <header class="section-heading">
+                    <p class="eyebrow">EVENTOS</p>
+                    <h2 id="titulo-eventos">Ocorrências do sistema</h2>
+                    <p class="description">
+                        Picos de potência registrados hoje acima do limite configurado.
+                    </p>
+                </header>
+                <section class="panel peak-panel">
+                    <h2 id="titulo-picos" class="panel-title">
+                        <i data-lucide="triangle-alert"></i>
+                        Picos acima de 1.000 W
+                    </h2>
+                    <ul id="listaPicos" class="peak-list">
+                        <li class="empty-state">Nenhum pico registrado hoje.</li>
+                    </ul>
+                </section>
+            </section>
+            <section id="configuracoes" class="page-section" aria-labelledby="titulo-configuracoes">
+                <header class="section-heading">
+                    <p class="eyebrow">CONFIGURAÇÕES</p>
+                    <h2 id="titulo-configuracoes">Parâmetros do medidor</h2>
+                    <p class="description">
+                        Defina o limite de potência e a tarifa usada na estimativa de custos.
+                    </p>
+                </header>
+                <section class="panel config-panel">
+                    <h2 class="panel-title">
+                        <i data-lucide="settings"></i>
+                        Limite de pico
+                    </h2>
+                    <label class="config-label" for="input-limite">
+                        <span>Potência em watts</span>
+                    </label>
+                    <div class="config-row">
+                        <input
+                            class="limit-input"
+                            type="number"
+                            id="input-limite"
+                            value="1000"
+                            min="1"
+                            step="1"
+                        />
+                        <button class="save-button" type="button" onclick="salvarNovoLimite()">
+                            Salvar
+                        </button>
+                    </div>
+                    <p aria-live="polite" id="msg-limite" class="limit-message"></p>
+                </section>
+                <section
+                    id="tarifa-energia"
+                    class="panel config-panel tariff-panel"
+                    aria-labelledby="titulo-tarifa"
+                >
+                    <h2 id="titulo-tarifa" class="panel-title">
+                        <i data-lucide="wallet" aria-hidden="true"></i>
+                        Tarifa de energia
+                    </h2>
+                    <p class="description">
+                        Selecione sua localidade e distribuidora ou informe o preço por kWh da sua
+                        conta.
+                    </p>
+                    <form id="form-tarifa" novalidate>
+                        <fieldset id="tarifa-campos" disabled>
+                            <legend class="sr-only">Configuração da tarifa</legend>
+                            <label class="config-label" for="tarifa-modo">
+                                Como definir a tarifa
+                            </label>
+                            <select id="tarifa-modo" class="limit-input">
+                                <option value="localidade">Por localidade (ANEEL)</option>
+                                <option value="manual">Informar valor da conta</option>
+                            </select>
+                            <div id="tarifa-localidade" class="tariff-fields">
+                                <div class="tariff-location-row">
+                                    <div>
+                                        <label class="config-label" for="tarifa-uf">Estado</label>
+                                        <select id="tarifa-uf" class="limit-input" required>
+                                            <option value="">Selecione o estado</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="config-label" for="tarifa-municipio">
+                                            Cidade (opcional)
+                                        </label>
+                                        <select id="tarifa-municipio" class="limit-input" disabled>
+                                            <option value="">Todo o estado</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="config-label" for="tarifa-distribuidora">
+                                        Distribuidora da sua conta
+                                    </label>
+                                    <select
+                                        id="tarifa-distribuidora"
+                                        class="limit-input"
+                                        required
+                                        disabled
+                                    >
+                                        <option value="">Selecione o estado primeiro</option>
+                                    </select>
+                                </div>
+                                <p class="tariff-help">
+                                    A tarifa varia por distribuidora. A cidade ajuda a filtrar as
+                                    opções; confira o nome na sua conta de energia.
+                                </p>
+                                <div class="tariff-preview">
+                                    <span>Tarifa da seleção</span>
+                                    <strong id="tarifa-previa">—</strong>
+                                    <p id="tarifa-vigencia-previa">Selecione uma distribuidora.</p>
+                                </div>
+                                <p id="tarifa-fonte" class="tariff-help">
+                                    Fonte: ANEEL · tarifa residencial convencional.
+                                </p>
+                                <p id="tarifa-catalogo-aviso" class="tariff-help" role="status"></p>
+                            </div>
+                            <div id="tarifa-manual" class="tariff-fields" hidden>
+                                <div>
+                                    <label class="config-label" for="tarifa-valor">
+                                        Preço da energia (R$/kWh)
+                                    </label>
+                                    <input
+                                        id="tarifa-valor"
+                                        class="limit-input"
+                                        type="text"
+                                        inputmode="decimal"
+                                        autocomplete="off"
+                                        placeholder="Ex.: 0,850000"
+                                        aria-describedby="tarifa-ajuda-manual"
+                                        disabled
+                                    />
+                                </div>
+                                <p id="tarifa-ajuda-manual" class="tariff-help">
+                                    Use o preço por kWh da sua conta, maior que zero, com até 6
+                                    casas decimais. O limite é R$ 100/kWh.
+                                </p>
+                            </div>
+                            <button
+                                id="salvar-tarifa"
+                                class="save-button tariff-save"
+                                type="submit"
+                            >
+                                Salvar tarifa
+                            </button>
+                        </fieldset>
+                        <p id="feedback-tarifa" class="feedback" aria-live="polite">
+                            Carregando configuração…
+                        </p>
+                        <button
+                            id="recarregar-tarifa"
+                            class="save-button tariff-save"
+                            type="button"
+                            hidden
+                        >
+                            Tentar novamente
+                        </button>
+                    </form>
+                    <div class="tariff-saved">
+                        <span>Tarifa salva para o cálculo</span>
+                        <strong id="tarifa-salva">Nenhuma tarifa configurada</strong>
+                        <p id="tarifa-salva-detalhes">
+                            Os custos aparecerão após salvar uma tarifa.
+                        </p>
+                    </div>
+                    <p id="tarifa-aviso" class="tariff-help">
+                        Estimativa = consumo medido × tarifa salva, aplicada a todo o período. As
+                        tarifas ANEEL são residenciais convencionais, sem impostos, bandeiras
+                        tarifárias ou iluminação pública; o valor não representa a conta final.
+                    </p>
+                </section>
+            </section>
+            <footer class="footer">
+                <span>Energia / Monitor DC</span>
+                <span>Leituras atualizadas a cada 2 segundos</span>
+            </footer>
+        </main>
+        <script src="controle-tensao.js"></script>
+        <script src="custos.js"></script>
+        <script src="api.js"></script>
+        <script src="formatacao.js"></script>
+        <script src="graficos.js"></script>
+        <script src="leituras.js"></script>
+        <script src="consumo.js"></script>
+        <script src="picos.js"></script>
+        <script src="comandos.js"></script>
+        <script src="script.js"></script>
+        <script src="navigation.js"></script>
+    </body>
 </html>

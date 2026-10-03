@@ -1,13 +1,10 @@
-#n-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# Sistema Operacional
 .DS_Store
 Thumbs.db Dependências
 node_modules/
 
-# Variáveis de ambiente e segredos
 .env
 
 *.log
