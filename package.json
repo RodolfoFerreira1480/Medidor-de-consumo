@@ -5,8 +5,9 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node --check server.js && node --check lib/tarifas.js && node --check scripts/atualizar-tarifas.cjs && node --check front-end/script.js && node --check front-end/controle-tensao.js && node --check front-end/theme.js && node --check front-end/custos.js && node --test tests/*.test.js",
-    "tarifas:atualizar": "node scripts/atualizar-tarifas.cjs"
+    "test": "npm run check",
+    "tarifas:atualizar": "node Back-end/atualizar-tarifas.cjs",
+    "check": "node --check server.js && node --check Back-end/atualizar-tarifas.cjs && node --check Back-end/banco.js && node --check Back-end/configuracao.js && node --check Back-end/consumo.js && node --check Back-end/controle.js && node --check Back-end/estado.js && node --check Back-end/medicoes.js && node --check Back-end/mqtt.js && node --check Back-end/rotas.js && node --check Back-end/servidor.js && node --check Back-end/tarifas.js && node --check front-end/api.js && node --check front-end/comandos.js && node --check front-end/consumo.js && node --check front-end/controle-tensao.js && node --check front-end/custos.js && node --check front-end/formatacao.js && node --check front-end/graficos.js && node --check front-end/leituras.js && node --check front-end/navigation.js && node --check front-end/picos.js && node --check front-end/script.js && node --check front-end/theme.js"
   },
   "keywords": [],
   "author": "",
